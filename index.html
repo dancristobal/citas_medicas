@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Citas Médicas & Google Calendar</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome para Iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen">
+
+    <!-- Navbar -->
+    <nav class="bg-white border-b border-slate-100 sticky top-0 z-50 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-indigo-500 text-white p-2 rounded-xl shadow-md shadow-indigo-100">
+                    <i class="fa-solid fa-heart-pulse text-xl"></i>
+                </div>
+                <span class="text-xl font-bold bg-gradient-to-r from-indigo-600 to-blue-600 bg-clip-text text-transparent">Citas Médicas</span>
+            </div>
+            <!-- Google Auth Buttons -->
+            <div>
+                <button id="btn-login" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition duration-200 flex items-center space-x-2 shadow-sm">
+                    <i class="fa-brands fa-google"></i> <span>Conectar Google</span>
+                </button>
+                <button id="btn-logout" class="hidden bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded-xl text-sm font-medium transition duration-200">
+                    <i class="fa-solid fa-arrow-right-from-bracket mr-1"></i> Cerrar Sesión
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <!-- Formulario de Citas (Izquierda) -->
+        <section class="lg:col-span-1">
+            <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm sticky top-24">
+                <h2 id="form-title" class="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-calendar-plus text-indigo-500"></i> Agendar Nueva Cita
+                </h2>
+                
+                <form id="appointment-form" class="space-y-4">
+                    <input type="hidden" id="appointment-id">
+                    <input type="hidden" id="gcal-event-id">
+
+                    <!-- Descripción -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Descripción de la Cita</label>
+                        <input type="text" id="desc" required placeholder="Ej. Consulta Dentista, Revisión General..." class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 text-sm transition">
+                    </div>
+
+                    <!-- Fecha y Hora -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Fecha</label>
+                            <input type="date" id="date" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 text-sm transition">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Hora</label>
+                            <input type="time" id="time" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 text-sm transition">
+                        </div>
+                    </div>
+
+                    <!-- Notificaciones Múltiples -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Notificaciones</label>
+                        <div class="flex gap-2 mb-2">
+                            <input type="number" id="notify-value" min="1" value="30" class="w-20 px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-500">
+                            <select id="notify-type" class="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:border-indigo-500">
+                                <option value="minutes">Minutos antes</option>
+                                <option value="hours">Horas antes</option>
+                                <option value="days">Días antes</option>
+                            </select>
+                            <button type="button" id="btn-add-notification" class="bg-slate-100 hover:bg-indigo-50 text-indigo-600 px-3 rounded-xl transition">
+                                <i class="fa-solid fa-plus"></i>
+                            </button>
+                        </div>
+                        <!-- Lista de recordatorios agregados -->
+                        <div id="notifications-list" class="flex flex-wrap gap-1.5 min-h-[32px] p-1 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                            <!-- Tags dinámicos -->
+                        </div>
+                    </div>
+
+                    <!-- Botones de Acción Obligatorios -->
+                    <div class="pt-2 space-y-2">
+                        <button type="submit" id="btn-create" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 rounded-xl text-sm transition duration-200 shadow-md shadow-indigo-100 flex justify-center items-center gap-2">
+                            <i class="fa-solid fa-circle-check"></i> Crear Cita
+                        </button>
+                        <div id="edit-actions" class="hidden space-y-2">
+                            <button type="button" id="btn-update" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2.5 rounded-xl text-sm transition duration-200 flex justify-center items-center gap-2">
+                                <i class="fa-solid fa-pen-to-square"></i> Modificar Cita
+                            </button>
+                            <button type="button" id="btn-delete" class="w-full bg-rose-500 hover:bg-rose-600 text-white font-medium py-2.5 rounded-xl text-sm transition duration-200 flex justify-center items-center gap-2">
+                                <i class="fa-solid fa-trash-can"></i> Eliminar Cita
+                            </button>
+                            <button type="button" id="btn-cancel-edit" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-500 font-medium py-2 rounded-xl text-xs transition text-center">
+                                Cancelar Edición
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- Calendario y Tarjetas de Citas (Derecha) -->
+        <section class="lg:col-span-2 space-y-6">
+            <!-- Calendario Mensual -->
+            <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 id="calendar-month-year" class="text-lg font-semibold text-slate-900 capitalize">Mes Año</h2>
+                    <div class="flex space-x-1">
+                        <button id="prev-month" class="p-2 text-slate-600 hover:bg-slate-50 rounded-lg transition"><i class="fa-solid fa-chevron-left"></i></button>
+                        <button id="next-month" class="p-2 text-slate-600 hover:bg-slate-50 rounded-lg transition"><i class="fa-solid fa-chevron-right"></i></button>
+                    </div>
+                </div>
+                <!-- Grid de Días de la semana -->
+                <div class="grid grid-cols-7 gap-1 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                    <div>Dom</div><div>Lun</div><div>Mar</div><div>Mié</div><div>Jue</div><div>Vie</div><div>Sáb</div>
+                </div>
+                <!-- Grid de los días del mes -->
+                <div id="calendar-grid" class="grid grid-cols-7 gap-1 text-sm">
+                    <!-- Dinámico -->
+                </div>
+            </div>
+
+            <!-- Listado de próximas citas en formato Tarjetas -->
+            <div>
+                <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Tus Citas Programadas</h3>
+                <div id="appointments-cards" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Tarjetas dinámicas -->
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- LÓGICA DE JAVASCRIPT -->
+    <script>
+        // CONFIGURACIÓN DE CREDENCIALES GOOGLE (Reemplaza con tus datos reales)
+        const CLIENT_ID = '88055812670-o3vspk5bm5kdt3a6juuq07c183assjih.apps.googleusercontent.com';
+        const API_KEY = 'AIzaSyA2tS4DMO7Ci2Kd3gvKELgpq3UGtaj34ec';
+        const SCOPES = 'https://www.googleapis.com/auth/calendar.events';
+
+        let gapiInited = false;
+        let gisInited = false;
+        let tokenClient;
+        let localAppointments = JSON.parse(localStorage.getItem('med_appointments')) || [];
+        let currentReminders = [];
+        let currentMonthDate = new Date();
+
+        // Elementos DOM
+        const form = document.getElementById('appointment-form');
+        const btnLogin = document.getElementById('btn-login');
+        const btnLogout = document.getElementById('btn-logout');
+        const notificationsList = document.getElementById('notifications-list');
+        const cardsContainer = document.getElementById('appointments-cards');
+
+        // --- AUTENTICACIÓN GOOGLE IDENTITY SERVICES ---
+
+        // 1. Inicializar GAPI Client
+        function gapiLoaded() {
+            gapi.load('client', async () => {
+                try {
+                    await gapi.client.init({
+                        apiKey: API_KEY,
+                        discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest']
+                    });
+                    gapiInited = true;
+                    maybeEnableAuth();
+                } catch (error) {
+                    console.error("Error inicializando GAPI Client:", error);
+                }
+            });
+        }
+
+   
+// 2. Inicializar GIS (Sin la restricción de texto)
+        function gisLoaded() {
+            try {
+                // Eliminamos la alerta del "TU_CLIENT_ID" para que use lo que sea que tenga la variable
+                console.log("Intentando inicializar con las credenciales actuales...");
+
+                tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: CLIENT_ID, // Usará el valor directo de la constante arriba declarada
+                    scope: SCOPES,
+                    error_callback: (err) => {
+                        alert("Google emitió un error de configuración:\n" + JSON.stringify(err));
+                        console.error("Error detallado:", err);
+                    },
+                    callback: (resp) => {
+                        if (resp.error) {
+                            console.error("Error en respuesta de autenticación:", resp.error);
+                            return;
+                        }
+                        localStorage.setItem('gcal_token', resp.access_token);
+                        updateAuthUI(true);
+                    },
+                });
+
+                if (tokenClient) {
+                    console.log("tokenClient creado con éxito en memoria.");
+                    gisInited = true;
+                    maybeEnableAuth();
+                }
+
+            } catch (error) {
+                console.error("Error crítico al inicializar Google Identity Client:", error);
+            }
+        }
+
+        function maybeEnableAuth() {
+            if (gapiInited && gisInited) {
+                const token = localStorage.getItem('gcal_token');
+                if (token) {
+                    gapi.client.setToken({ access_token: token });
+                    updateAuthUI(true);
+                }
+            }
+        }
+
+        // Evento Seguro para el Botón Conectar Google
+        btnLogin.onclick = () => {
+            if (!tokenClient) {
+                alert("El servicio de Google aún está cargando o las credenciales CLIENT_ID son incorrectas. Por favor, revisa la consola del navegador (F12).");
+                return;
+            }
+            
+            if (gapi.client.getToken() === null) {
+                tokenClient.requestAccessToken({ prompt: 'consent' });
+            } else {
+                tokenClient.requestAccessToken({ prompt: '' });
+            }
+        };
+
+        btnLogout.onclick = () => {
+            const token = gapi.client.getToken();
+            if (token !== null) {
+                google.accounts.oauth2.revoke(token.access_token, () => {});
+                gapi.client.setToken(null);
+                localStorage.removeItem('gcal_token');
+                updateAuthUI(false);
+            }
+        };
+
+        function updateAuthUI(isLoggedIn) {
+            if (isLoggedIn) {
+                btnLogin.classList.add('hidden');
+                btnLogout.classList.remove('hidden');
+            } else {
+                btnLogin.classList.remove('hidden');
+                btnLogout.classList.add('hidden');
+            }
+        }
+
+        function checkGoogleAuth() {
+            if (!gapi.client.getToken()) {
+                alert("Por favor, conéctate a tu cuenta de Google primero usando el botón de 'Conectar Google' arriba a la derecha.");
+                return false;
+            }
+            return true;
+        }
+
+        // --- LÓGICA DE LA APLICACIÓN (CITAS, CALENDARIO Y TARJETAS) ---
+
+        // Recordatorios múltiples en el cliente
+        document.getElementById('btn-add-notification').onclick = () => {
+            const val = parseInt(document.getElementById('notify-value').value);
+            const type = document.getElementById('notify-type').value;
+            if(!val || val < 1) return;
+
+            let minutes = val;
+            if (type === 'hours') minutes = val * 60;
+            if (type === 'days') minutes = val * 1440;
+
+            if(!currentReminders.some(r => r.minutes === minutes)) {
+                currentReminders.push({ minutes, label: `${val} ${type === 'minutes' ? 'min' : type === 'hours' ? 'hr(s)' : 'día(s)'}` });
+                renderReminders();
+            }
+        };
+
+        function renderReminders() {
+            notificationsList.innerHTML = currentReminders.map((r, index) => `
+                <span class="inline-flex items-center bg-indigo-50 text-indigo-700 text-xs px-2.5 py-1 rounded-lg font-medium border border-indigo-100">
+                    <i class="fa-solid fa-bell mr-1.5 opacity-70"></i> ${r.label}
+                    <button type="button" onclick="removeReminder(${index})" class="ml-1.5 text-indigo-400 hover:text-indigo-800"><i class="fa-solid fa-xmark"></i></button>
+                </span>
+            `).join('');
+        }
+        window.removeReminder = (index) => { currentReminders.splice(index, 1); renderReminders(); };
+
+        function saveAndRefresh() {
+            localStorage.setItem('med_appointments', JSON.stringify(localAppointments));
+            renderCalendar();
+            renderCards();
+            resetForm();
+        }
+
+  // BOTÓN ACCIÓN: CREAR CITA (Versión de diagnóstico de errores)
+// BOTÓN ACCIÓN: CREAR CITA (Corregido el error de rango de tiempo 400)
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            if (document.getElementById('appointment-id').value) return; 
+            if (!checkGoogleAuth()) return;
+
+            const summary = document.getElementById('desc').value;
+            const date = document.getElementById('date').value; // Formato: YYYY-MM-DD
+            const time = document.getElementById('time').value; // Formato: HH:MM
+
+            // 1. Definir Hora de Inicio de forma limpia
+            const startDateTime = `${date}T${time}:00`;
+
+            // 2. Calcular Hora de Fin sumando exactamente 30 minutos de forma segura
+            const startJsDate = new Date(`${date}T${time}`);
+            const endJsDate = new Date(startJsDate.getTime() + 30 * 60000); // +30 mins
+            
+            const endHours = String(endJsDate.getHours()).padStart(2, '0');
+            const endMinutes = String(endJsDate.getMinutes()).padStart(2, '0');
+            const endDateTime = `${date}T${endHours}:${endMinutes}:00`;
+
+            const gcalReminders = currentReminders.map(r => ({ method: 'popup', minutes: r.minutes }));
+
+            // 3. Estructurar el evento para Google Calendar
+            const event = {
+                'summary': summary,
+                'description': 'Creado desde App Citas Médicas',
+                'start': { 
+                    'dateTime': startDateTime, 
+                    'timeZone': Intl.DateTimeFormat().resolvedOptions().timeZone 
+                },
+                'end': { 
+                    'dateTime': endDateTime, 
+                    'timeZone': Intl.DateTimeFormat().resolvedOptions().timeZone 
+                },
+                'reminders': { 
+                    'useDefault': false, 
+                    'overrides': gcalReminders 
+                }
+            };
+
+            try {
+                const response = await gapi.client.calendar.events.insert({ 'calendarId': 'primary', 'resource': event });
+                const newApp = {
+                    id: Date.now().toString(),
+                    gcalId: response.result.id,
+                    summary, date, time,
+                    reminders: [...currentReminders]
+                };
+                localAppointments.push(newApp);
+                saveAndRefresh();
+                alert("¡Cita creada con éxito en la App y sincronizada en tu Google Calendar!");
+            } catch (err) {
+                console.error("Error devuelto por Google Calendar API:", err);
+                alert("Error de Google Calendar:\n" + JSON.stringify(err.result || err));
+            }
+        };
+
+        // BOTÓN ACCIÓN: MODIFICAR CITA
+        document.getElementById('btn-update').onclick = async () => {
+            if (!checkGoogleAuth()) return;
+            const id = document.getElementById('appointment-id').value;
+            const gcalId = document.getElementById('gcal-event-id').value;
+            const summary = document.getElementById('desc').value;
+            const date = document.getElementById('date').value;
+            const time = document.getElementById('time').value;
+            const startDateTime = `${date}T${time}:00`;
+            const endDateTime = new Date(new Date(startDateTime).getTime() + 30*60000).toISOString().split('.')[0];
+
+            const gcalReminders = currentReminders.map(r => ({ method: 'popup', minutes: r.minutes }));
+
+            const event = {
+                'summary': summary,
+                'start': { 'dateTime': startDateTime },
+                'end': { 'dateTime': endDateTime },
+                'reminders': { 'useDefault': false, 'overrides': gcalReminders }
+            };
+
+            try {
+                await gapi.client.calendar.events.patch({ 'calendarId': 'primary', 'eventId': gcalId, 'resource': event });
+                const index = localAppointments.findIndex(a => a.id === id);
+                if(index !== -1) {
+                    localAppointments[index] = { id, gcalId, summary, date, time, reminders: [...currentReminders] };
+                }
+                saveAndRefresh();
+            } catch (err) {
+                console.error(err);
+                alert("Error al actualizar cambios en Google Calendar.");
+            }
+        };
+
+        // BOTÓN ACCIÓN: ELIMINAR CITA
+        document.getElementById('btn-delete').onclick = async () => {
+            if (!checkGoogleAuth()) return;
+            if(!confirm("¿Estás seguro de que deseas eliminar esta cita de la App y de Google Calendar?")) return;
+            const id = document.getElementById('appointment-id').value;
+            const gcalId = document.getElementById('gcal-event-id').value;
+
+            try {
+                await gapi.client.calendar.events.delete({ 'calendarId': 'primary', 'eventId': gcalId });
+                localAppointments = localAppointments.filter(a => a.id !== id);
+                saveAndRefresh();
+            } catch (err) {
+                console.error(err);
+                alert("Error al borrar de Google Calendar. Se removerá localmente.");
+                localAppointments = localAppointments.filter(a => a.id !== id);
+                saveAndRefresh();
+            }
+        };
+
+        // Pasar tarjeta al estado de edición en el formulario
+        window.initEdit = (id) => {
+            const app = localAppointments.find(a => a.id === id);
+            if(!app) return;
+
+            document.getElementById('appointment-id').value = app.id;
+            document.getElementById('gcal-event-id').value = app.gcalId;
+            document.getElementById('desc').value = app.summary;
+            document.getElementById('date').value = app.date;
+            document.getElementById('time').value = app.time;
+            currentReminders = [...app.reminders];
+            renderReminders();
+
+            document.getElementById('btn-create').classList.add('hidden');
+            document.getElementById('edit-actions').classList.remove('hidden');
+            document.getElementById('form-title').innerHTML = `<i class="fa-solid fa-user-doctor text-emerald-500"></i> Modificar Cita`;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        document.getElementById('btn-cancel-edit').onclick = resetForm;
+
+        function resetForm() {
+            form.reset();
+            document.getElementById('appointment-id').value = '';
+            document.getElementById('gcal-event-id').value = '';
+            currentReminders = [];
+            notificationsList.innerHTML = '';
+            document.getElementById('btn-create').classList.remove('hidden');
+            document.getElementById('edit-actions').classList.add('hidden');
+            document.getElementById('form-title').innerHTML = `<i class="fa-solid fa-calendar-plus text-indigo-500"></i> Agendar Nueva Cita`;
+        }
+
+        // --- INTERFAZ GRÁFICA: CALENDARIO Y TARJETAS ---
+
+        function renderCalendar() {
+            const year = currentMonthDate.getFullYear();
+            const month = currentMonthDate.getMonth();
+            const firstDayIndex = new Date(year, month, 1).getDay();
+            const lastDay = new Date(year, month + 1, 0).getDate();
+            const monthsNames = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+            
+            document.getElementById('calendar-month-year').innerText = `${monthsNames[month]} ${year}`;
+            let daysHtml = "";
+            
+            // Obtener la fecha y hora exacta de este preciso instante
+            const ahora = new Date();
+            
+            for (let i = 0; i < firstDayIndex; i++) {
+                daysHtml += `<div class="p-2 border border-slate-100 min-h-[90px] bg-slate-50/50"></div>`;
+            }
+
+            for (let day = 1; day <= lastDay; day++) {
+                const dayStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+                const isToday = new Date().toDateString() === new Date(year, month, day).toDateString();
+                const dayAppointments = localAppointments.filter(a => a.date === dayStr);
+
+                dayAppointments.sort((a, b) => a.time.localeCompare(b.time));
+
+                let eventsHtml = "";
+                if (dayAppointments.length > 0) {
+                    eventsHtml = `<div class="w-full space-y-1 mt-1 max-h-[60px] overflow-y-auto pr-0.5">`;
+                    dayAppointments.forEach(app => {
+                        // COMPARACIÓN: Creamos el objeto fecha de la cita para saber si ya pasó
+                        const fechaCita = new Date(`${app.date}T${app.time}`);
+                        const esPasada = fechaCita < ahora;
+
+                        // Definimos las clases de Tailwind según el estado
+                        const clasesEstilo = esPasada 
+                            ? "bg-slate-200 hover:bg-slate-300 text-slate-500 opacity-65 italic line-through decoration-slate-400" 
+                            : "bg-emerald-500 hover:bg-emerald-600 text-white font-medium";
+
+                        eventsHtml += `
+                            <div onclick="event.stopPropagation(); initEdit('${app.id}')" 
+                                 class="${clasesEstilo} text-[10px] p-1 rounded-md shadow-sm truncate cursor-pointer transition flex flex-col leading-tight select-none"
+                                 title="${app.summary} ${esPasada ? '(Pasada)' : ''}">
+                                <span class="${esPasada ? 'text-slate-500' : 'font-bold opacity-90'}">${app.time}</span>
+                                <span class="truncate">${app.summary}</span>
+                            </div>
+                        `;
+                    });
+                    eventsHtml += `</div>`;
+                }
+
+                daysHtml += `
+                    <div class="p-1.5 border border-slate-100 rounded-xl flex flex-col justify-between min-h-[95px] transition-all ${isToday ? 'bg-indigo-50/40 ring-1 ring-indigo-200' : 'hover:bg-slate-50/80 bg-white'}">
+                        <div class="flex justify-between items-center w-full">
+                            <span class="text-xs font-semibold ${isToday ? 'bg-indigo-600 text-white w-5 h-5 flex items-center justify-center rounded-full shadow-sm shadow-indigo-200' : 'text-slate-700'}">${day}</span>
+                        </div>
+                        ${eventsHtml}
+                    </div>
+                `;
+            }
+            document.getElementById('calendar-grid').innerHTML = daysHtml;
+        }
+
+// INTERFAZ GRÁFICA: TARJETAS DE CITAS (Con botón de borrar en citas pasadas)
+        function renderCards() {
+            const sorted = [...localAppointments].sort((a,b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
+            if(sorted.length === 0) {
+                cardsContainer.innerHTML = `
+                    <div class="col-span-full bg-white p-8 text-center rounded-2xl border border-slate-100 text-slate-400">
+                        <i class="fa-solid fa-calendar-day text-3xl mb-2 text-slate-300"></i>
+                        <p class="text-sm">No tienes citas programadas.</p>
+                    </div>`;
+                return;
+            }
+
+            const ahora = new Date();
+
+            cardsContainer.innerHTML = sorted.map(app => {
+                const fechaCita = new Date(`${app.date}T${app.time}`);
+                const esPasada = fechaCita < ahora;
+
+                return `
+                    <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition duration-200 flex flex-col justify-between group ${esPasada ? 'opacity-55 bg-slate-50/60 border-dashed' : ''}">
+                        <div>
+                            <div class="flex justify-between items-start gap-2 mb-2">
+                                <h4 class="font-semibold text-sm md:text-base ${esPasada ? 'text-slate-400 line-through' : 'text-slate-800'}">${app.summary}</h4>
+                                
+                                ${esPasada ? `
+                                    <!-- Si es pasada: Muestra etiqueta y botón de eliminar -->
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-[10px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-medium flex items-center gap-1 whitespace-nowrap">
+                                            <i class="fa-solid fa-check text-[9px]"></i> Pasada
+                                        </span>
+                                        <button onclick="deleteAppointment('${app.id}', '${app.gCalId || app.gcalId}')" 
+                                                class="text-slate-400 hover:text-rose-600 p-1 transition text-xs" 
+                                                title="Eliminar del historial">
+                                            <i class="fa-solid fa-trash"></i>
+                                        </button>
+                                    </div>
+                                ` : `
+                                    <!-- Si es futura: Muestra el botón clásico de gestionar -->
+                                    <button onclick="initEdit('${app.id}')" class="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-indigo-600 p-1 transition text-xs flex items-center gap-1">
+                                        <i class="fa-solid fa-pencil"></i> Gestionar
+                                    </button>
+                                `}
+                            </div>
+                            <div class="space-y-1 text-xs text-slate-500 mb-3">
+                                <div class="flex items-center gap-1.5"><i class="fa-regular fa-calendar ${esPasada ? 'text-slate-300' : 'text-indigo-400'}"></i> ${app.date.split('-').reverse().join('/')}</div>
+                                <div class="flex items-center gap-1.5"><i class="fa-regular fa-clock ${esPasada ? 'text-slate-300' : 'text-indigo-400'}"></i> ${app.time} hs</div>
+                            </div>
+                        </div>
+                        ${app.reminders.length > 0 && !esPasada ? `
+                            <div class="flex flex-wrap gap-1 border-t border-slate-50 pt-2">
+                                ${app.reminders.map(r => `<span class="text-[10px] bg-slate-50 text-slate-600 px-1.5 py-0.5 rounded-md"><i class="fa-solid fa-bell text-slate-300 mr-0.5"></i> ${r.label}</span>`).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        document.getElementById('prev-month').onclick = () => { currentMonthDate.setMonth(currentMonthDate.getMonth() - 1); renderCalendar(); };
+        document.getElementById('next-month').onclick = () => { currentMonthDate.setMonth(currentMonthDate.getMonth() + 1); renderCalendar(); };
+
+        // Carga inicial de elementos locales
+        renderCalendar();
+        renderCards();
+    </script>
+
+    <!-- INVOCACIÓN DE SCRIPTS EXTERNOS DE GOOGLE -->
+    <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+    <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
+</body>
+</html>
