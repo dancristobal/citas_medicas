@@ -1,0 +1,1611 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Citas Médicas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://apis.google.com/js/api.js" async defer></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/inter@5.0.0/index.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/poppins@5.0.0/index.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Poppins', 'sans-serif'],
+                    },
+                    colors: {
+                        medical: {
+                            50: '#f0f9ff', 100: '#e0f2fe', 200: '#bae6fd', 300: '#7dd3fc',
+                            400: '#38bdf8', 500: '#0ea5e9', 600: '#0284c7', 700: '#0369a1',
+                            800: '#075985', 900: '#0c4a6e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: #f8fafc; }
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .slide-up { animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+        .scale-in { animation: scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        @keyframes scaleIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+        .calendar-day:hover { transform: scale(1.05); transition: all 0.2s; }
+        .modal-overlay { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); }
+        .btn-primary {
+            background: linear-gradient(135deg, #0ea5e9, #0284c7);
+            transition: all 0.3s;
+        }
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #38bdf8, #0ea5e9);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(14, 165, 233, 0.4);
+        }
+        .btn-danger {
+            background: linear-gradient(135deg, #f87171, #ef4444);
+            transition: all 0.3s;
+        }
+        .btn-danger:hover {
+            background: linear-gradient(135deg, #fca5a5, #f87171);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+        }
+        .card-hover { transition: all 0.3s; }
+        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
+        .notification-badge {
+            background: linear-gradient(135deg, #a78bfa, #7c3aed);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+        .today-ring { box-shadow: 0 0 0 2px #0ea5e9; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .gradient-header { background: linear-gradient(135deg, #0c4a6e 0%, #0369a1 50%, #0ea5e9 100%); }
+        .step-indicator {
+            width: 28px; height: 28px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.75rem; font-weight: 700;
+        }
+        .step-active { background: #0ea5e9; color: white; }
+        .step-done { background: #10b981; color: white; }
+        .step-pending { background: #e2e8f0; color: #94a3b8; }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-sky-50">
+
+    <!-- Header -->
+    <header class="gradient-header text-white shadow-lg sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="bg-white/20 p-2 rounded-xl">
+                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="font-display text-xl font-bold tracking-tight">Citas Médicas</h1>
+                    <p class="text-blue-200 text-xs">Gestión inteligente de tus citas</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="openSettings()" class="p-2 hover:bg-white/10 rounded-lg transition-colors" title="Configuración API">
+                    <svg class="w-5 h-5 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                </button>
+                <button id="btnSync" onclick="handleSyncClick()" class="flex items-center gap-2 bg-white/15 hover:bg-white/25 px-4 py-2 rounded-xl text-sm font-medium transition-all">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+                    <span id="btnSyncText" class="hidden sm:inline">Google Calendar</span>
+                    <span id="btnSyncConnected" class="hidden bg-green-400 w-2 h-2 rounded-full"></span>
+                </button>
+                <button id="btnNewAppointment" onclick="handleNewAppointment()" class="btn-primary flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                    <span class="hidden sm:inline">Nueva Cita</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 py-6">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 mb-6">
+                    <div class="flex items-center justify-between mb-6">
+                        <button onclick="changeMonth(-1)" class="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+                            <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                        </button>
+                        <h2 id="currentMonth" class="font-display text-lg font-bold text-slate-800"></h2>
+                        <button onclick="changeMonth(1)" class="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+                            <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-7 gap-1 mb-2">
+                        <div class="text-center text-xs font-semibold text-slate-400 py-2">Lun</div>
+                        <div class="text-center text-xs font-semibold text-slate-400 py-2">Mar</div>
+                        <div class="text-center text-xs font-semibold text-slate-400 py-2">Mié</div>
+                        <div class="text-center text-xs font-semibold text-slate-400 py-2">Jue</div>
+                        <div class="text-center text-xs font-semibold text-slate-400 py-2">Vie</div>
+                        <div class="text-center text-xs font-semibold text-slate-400 py-2">Sáb</div>
+                        <div class="text-center text-xs font-semibold text-slate-400 py-2">Dom</div>
+                    </div>
+                    <div id="calendarGrid" class="grid grid-cols-7 gap-1"></div>
+                </div>
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-display text-base font-bold text-slate-800 flex items-center gap-2">
+                            <svg class="w-5 h-5 text-medical-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                            Próximas Citas
+                        </h3>
+                        <span id="totalCitas" class="bg-medical-100 text-medical-700 text-xs font-semibold px-3 py-1 rounded-full">0 citas</span>
+                    </div>
+                    <div id="appointmentsList" class="space-y-3 max-h-96 overflow-y-auto pr-1"></div>
+                    <div id="appointmentsPagination" class="mt-4 hidden items-center justify-between gap-3 border-t border-slate-100 pt-3"></div>
+                </div>
+            </div>
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 mb-6">
+                    <h3 class="font-display text-sm font-bold text-slate-800 mb-4">Resumen de citas</h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-gradient-to-br from-blue-50 to-sky-50 rounded-xl p-4 text-center">
+                            <p id="statTotal" class="text-2xl font-bold text-medical-600">0</p>
+                            <p class="text-xs text-slate-500 mt-1">Total Citas</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-4 text-center">
+                            <p id="statUpcoming" class="text-2xl font-bold text-green-600">0</p>
+                            <p class="text-xs text-slate-500 mt-1">Próximas</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl p-4 text-center">
+                            <p id="statToday" class="text-2xl font-bold text-purple-600">0</p>
+                            <p class="text-xs text-slate-500 mt-1">Hoy</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-xl p-4 text-center">
+                            <p id="statPassed" class="text-2xl font-bold text-amber-600">0</p>
+                            <p class="text-xs text-slate-500 mt-1">Pasadas</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+                    <h3 class="font-display text-sm font-bold text-slate-800 mb-4">Acciones Rápidas</h3>
+                    <div class="space-y-3">
+                        <button onclick="handleNewAppointment()" class="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-blue-50 transition-colors group">
+                            <div class="bg-blue-100 p-2 rounded-lg group-hover:bg-blue-200 transition-colors">
+                                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                            </div>
+                            <div class="text-left">
+                                <p class="text-sm font-medium text-slate-700">Crear Nueva Cita</p>
+                                <p class="text-xs text-slate-400">Añadir cita al calendario</p>
+                            </div>
+                        </button>
+                        <button onclick="handleSyncClick()" class="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-green-50 transition-colors group">
+                            <div class="bg-green-100 p-2 rounded-lg group-hover:bg-green-200 transition-colors">
+                                <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                            </div>
+                            <div class="text-left">
+                                <p class="text-sm font-medium text-slate-700">Sincronizar Google</p>
+                                <p class="text-xs text-slate-400">Actualizar Google Calendar</p>
+                            </div>
+                        </button>
+                        <button onclick="goToToday()" class="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-purple-50 transition-colors group">
+                            <div class="bg-purple-100 p-2 rounded-lg group-hover:bg-purple-200 transition-colors">
+                                <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                            </div>
+                            <div class="text-left">
+                                <p class="text-sm font-medium text-slate-700">Ir a Hoy</p>
+                                <p class="text-xs text-slate-400">Mostrar mes actual</p>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Create/Edit Modal -->
+    <div id="appointmentModal" class="fixed inset-0 z-50 hidden">
+        <div class="modal-overlay absolute inset-0" onclick="closeModal()"></div>
+        <div class="absolute inset-0 flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto scale-in relative">
+                <div class="gradient-header text-white p-6 rounded-t-2xl">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="bg-white/20 p-2 rounded-lg">
+                                <svg id="modalIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                            </div>
+                            <h3 id="modalTitle" class="font-display text-lg font-bold">Nueva Cita Médica</h3>
+                        </div>
+                        <button onclick="closeModal()" class="p-1 hover:bg-white/20 rounded-lg transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+                </div>
+                <form id="appointmentForm" onsubmit="handleFormSubmit(event)" class="p-6 space-y-5">
+                    <input type="hidden" id="appointmentId">
+                    <input type="hidden" id="googleEventId">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">
+                            <span class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-medical-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/></svg>
+                                Descripción de la Cita
+                            </span>
+                        </label>
+                        <input type="text" id="descripcion" required placeholder="Ej: Consulta con el Dr. García" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-medical-400 focus:ring-2 focus:ring-medical-100 outline-none transition-all text-sm">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 mb-2">
+                                <span class="flex items-center gap-2">
+                                    <svg class="w-4 h-4 text-medical-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                    Fecha
+                                </span>
+                            </label>
+                            <input type="date" id="fecha" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-medical-400 focus:ring-2 focus:ring-medical-100 outline-none transition-all text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 mb-2">
+                                <span class="flex items-center gap-2">
+                                    <svg class="w-4 h-4 text-medical-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                    Hora
+                                </span>
+                            </label>
+                            <input type="time" id="hora" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-medical-400 focus:ring-2 focus:ring-medical-100 outline-none transition-all text-sm">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">
+                            <span class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-medical-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+                                Notificaciones
+                            </span>
+                        </label>
+                        <div id="notificationsContainer" class="space-y-2"></div>
+                        <button type="button" onclick="addNotification()" class="mt-3 flex items-center gap-2 text-medical-600 hover:text-medical-700 text-sm font-medium">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                            Añadir notificación
+                        </button>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">
+                            <span class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-medical-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                Ubicación (opcional)
+                            </span>
+                        </label>
+                        <input type="text" id="ubicacion" placeholder="Ej: Hospital Central, Consultorio 301" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-medical-400 focus:ring-2 focus:ring-medical-100 outline-none transition-all text-sm">
+                    </div>
+                    <div class="flex gap-3 pt-2">
+                        <button type="button" id="btnDelete" onclick="handleDelete()" class="hidden btn-danger flex items-center gap-2 px-5 py-3 rounded-xl text-white font-semibold text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                            Eliminar
+                        </button>
+                        <div class="flex-1"></div>
+                        <button type="button" onclick="closeModal()" class="px-5 py-3 rounded-xl border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition-colors">
+                            Cancelar
+                        </button>
+                        <button type="submit" id="btnSubmit" class="btn-primary flex items-center gap-2 px-5 py-3 rounded-xl text-white font-semibold text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            <span id="submitText">Crear Cita</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Google Auth Modal -->
+    <div id="authModal" class="fixed inset-0 z-50 hidden">
+        <div class="modal-overlay absolute inset-0" onclick="closeAuthModal()"></div>
+        <div class="absolute inset-0 flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md scale-in overflow-hidden">
+                <div id="authContent" class="p-6">
+                    <div class="text-center mb-6">
+                        <div class="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg class="w-8 h-8 text-blue-600" fill="currentColor" viewBox="0 0 24 24"><path d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z"/></svg>
+                        </div>
+                        <h3 class="font-display text-lg font-bold text-slate-800">Conectar Google Calendar</h3>
+                        <p class="text-sm text-slate-500 mt-2">Conecta tu cuenta de Google para sincronizar las citas.</p>
+                    </div>
+                    <div class="flex items-center justify-center gap-3 mb-6">
+                        <div class="flex flex-col items-center">
+                            <div id="step1Indicator" class="step-indicator step-pending">1</div>
+                            <p class="text-[10px] text-slate-400 mt-1">Credenciales</p>
+                        </div>
+                        <div class="w-12 h-0.5 bg-slate-200"></div>
+                        <div class="flex flex-col items-center">
+                            <div id="step2Indicator" class="step-indicator step-pending">2</div>
+                            <p class="text-[10px] text-slate-400 mt-1">Autorización</p>
+                        </div>
+                        <div class="w-12 h-0.5 bg-slate-200"></div>
+                        <div class="flex flex-col items-center">
+                            <div id="step3Indicator" class="step-indicator step-pending">3</div>
+                            <p class="text-[10px] text-slate-400 mt-1">Sincronización</p>
+                        </div>
+                    </div>
+                    <div id="authMessage" class="hidden mb-4 p-4 rounded-xl fade-in text-sm"></div>
+                    <div class="space-y-3">
+                        <button id="btnConnectGoogle" onclick="startGoogleAuth()" class="w-full btn-primary flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-white font-semibold text-sm">
+                            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z"/></svg>
+                            <span id="btnConnectText">Conectar con Google</span>
+                        </button>
+                        <button onclick="closeAuthModal(); openSettings();" class="w-full px-4 py-3 rounded-xl border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition-colors">
+                            Configurar credenciales
+                        </button>
+                        <button onclick="closeAuthModal()" class="w-full px-4 py-3 rounded-xl border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition-colors">
+                            Cancelar
+                        </button>
+                    </div>
+                </div>
+                <div id="authLoading" class="hidden p-12 text-center">
+                    <div class="inline-block">
+                        <div class="w-16 h-16 border-4 border-medical-200 border-t-medical-600 rounded-full animate-spin mx-auto mb-4"></div>
+                        <p id="authLoadingText" class="text-slate-600 font-medium">Conectando con Google...</p>
+                        <p class="text-xs text-slate-400 mt-1">Por favor, espera un momento</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirmModal" class="fixed inset-0 z-50 hidden">
+        <div class="modal-overlay absolute inset-0" onclick="closeConfirm()"></div>
+        <div class="absolute inset-0 flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm scale-in">
+                <div class="p-6 text-center">
+                    <div class="bg-red-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                    </div>
+                    <h3 class="font-display text-lg font-bold text-slate-800 mb-2">¿Eliminar Cita?</h3>
+                    <p id="confirmText" class="text-sm text-slate-500 mb-6">Esta acción no se puede deshacer.</p>
+                    <div class="flex gap-3">
+                        <button onclick="closeConfirm()" class="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition-colors">Cancelar</button>
+                        <button id="btnConfirmDelete" class="flex-1 btn-danger px-4 py-2.5 rounded-xl text-white font-semibold text-sm">Eliminar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Panel -->
+    <div id="settingsPanel" class="fixed inset-0 z-50 hidden">
+        <div class="modal-overlay absolute inset-0" onclick="closeSettings()"></div>
+        <div class="absolute inset-y-0 right-0 w-full max-w-md bg-white shadow-2xl">
+            <div class="h-full flex flex-col">
+                <div class="gradient-header text-white p-6">
+                    <div class="flex items-center justify-between">
+                        <h3 class="font-display text-lg font-bold">Configuración API</h3>
+                        <button onclick="closeSettings()" class="p-1 hover:bg-white/20 rounded-lg transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="p-6 space-y-4 flex-1 overflow-y-auto">
+                    <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
+                        <p class="text-xs text-indigo-700">
+                            <strong>Arquitectura moderna de Google:</strong><br>
+                            GAPI envía datos a Calendar (API Key) + GIS abre login y pide permisos (Client ID).
+                        </p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">API Key</label>
+                        <input type="text" id="apiKey" placeholder="AIzaSy..." class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-medical-400 focus:ring-2 focus:ring-medical-100 outline-none transition-all text-sm font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">Client ID (OAuth 2.0)</label>
+                        <input type="text" id="clientId" placeholder="123456-abc...apps.googleusercontent.com" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-medical-400 focus:ring-2 focus:ring-medical-100 outline-none transition-all text-sm font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">Origen actual</label>
+                        <div class="bg-slate-50 rounded-xl p-3">
+                            <p class="text-xs text-slate-600 font-mono" id="currentOrigin"></p>
+                        </div>
+                    </div>
+                    <div id="settingsMessage" class="hidden p-4 rounded-xl fade-in"></div>
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                        <p class="text-xs text-blue-700">
+                            <strong>Instrucciones:</strong><br>
+                            1. Ve a <a href="https://console.cloud.google.com" target="_blank" class="underline">console.cloud.google.com</a><br>
+                            2. Habilita Google Calendar API<br>
+                            3. Crea credenciales OAuth 2.0 (Aplicación web)<br>
+                            4. Añade el origen como autorizado<br>
+                            5. Crea una API Key con restricción HTTP<br>
+                            6. Copia ambas credenciales aquí
+                        </p>
+                    </div>
+                    <button onclick="saveSettings()" class="w-full btn-primary px-4 py-3 rounded-xl text-white font-semibold text-sm">Guardar Configuración</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-6 right-6 z-50 hidden">
+        <div class="bg-white rounded-xl shadow-lg border border-slate-100 p-4 flex items-center gap-3 scale-in max-w-sm">
+            <div id="toastIcon" class="bg-green-100 p-2 rounded-lg">
+                <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            </div>
+            <div>
+                <p id="toastTitle" class="text-sm font-semibold text-slate-800">Éxito</p>
+                <p id="toastMessage" class="text-xs text-slate-500">Operación realizada correctamente</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===== STATE =====
+        let appointments = JSON.parse(localStorage.getItem('medicalAppointments') || '[]');
+        let currentMonth = new Date().getMonth();
+        let currentYear = new Date().getFullYear();
+        let gisTokenClient = null;
+        let gapiInitialized = false;
+        let isGoogleConnected = false;
+        let gisAccessToken = null;
+        let currentAppointmentsPage = 1;
+        let appointmentsPerPage = 5;
+
+        const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+        // ===== CALENDAR =====
+        function renderCalendar() {
+            const grid = document.getElementById('calendarGrid');
+            document.getElementById('currentMonth').textContent = monthNames[currentMonth] + ' ' + currentYear;
+            grid.innerHTML = '';
+
+            var firstDay = new Date(currentYear, currentMonth, 1);
+            var lastDay = new Date(currentYear, currentMonth + 1, 0);
+            var startDayOfWeek = (firstDay.getDay() + 6) % 7;
+            var today = new Date();
+            var todayStr = formatDateStr(today.getFullYear(), today.getMonth(), today.getDate());
+
+            var i, day, dateStr, dayAppointments, isToday, cell, htmlContent, aptIdx, aptColor;
+
+            for (i = 0; i < startDayOfWeek; i++) {
+                var emptyCell = document.createElement('div');
+                emptyCell.className = 'p-2 min-h-[70px]';
+                grid.appendChild(emptyCell);
+            }
+
+            for (day = 1; day <= lastDay.getDate(); day++) {
+                dateStr = formatDateStr(currentYear, currentMonth, day);
+                dayAppointments = appointments.filter(function(a) { return a.fecha === dateStr; });
+                isToday = (dateStr === todayStr);
+
+                cell = document.createElement('div');
+                cell.className = 'calendar-day p-2 min-h-[70px] rounded-xl cursor-pointer transition-all' + (isToday ? ' bg-medical-50 today-ring' : ' hover:bg-slate-50');
+                (function(ds) {
+                    cell.onclick = function() { openCreateModal(null, ds); };
+                })(dateStr);
+
+                htmlContent = '<div class="flex items-center justify-between mb-1">';
+                htmlContent += '<span class="text-sm font-semibold ' + (isToday ? 'text-medical-600' : 'text-slate-600') + '">' + day + '</span>';
+                if (isToday) {
+                    htmlContent += '<span class="w-2 h-2 bg-medical-500 rounded-full"></span>';
+                }
+                htmlContent += '</div>';
+
+                if (dayAppointments.length > 0) {
+                    htmlContent += '<div class="space-y-1">';
+                    var showCount = Math.min(dayAppointments.length, 2);
+                    for (aptIdx = 0; aptIdx < showCount; aptIdx++) {
+                        aptColor = ['bg-blue-100 text-blue-700', 'bg-green-100 text-green-700', 'bg-purple-100 text-purple-700', 'bg-amber-100 text-amber-700'][aptIdx % 4];
+                        htmlContent += '<div class="' + aptColor + ' text-[10px] font-medium px-2 py-0.5 rounded-md truncate cursor-pointer hover:opacity-80" title="' + dayAppointments[aptIdx].descripcion + '">' + dayAppointments[aptIdx].hora + ' ' + dayAppointments[aptIdx].descripcion + '</div>';
+                    }
+                    if (dayAppointments.length > 2) {
+                        htmlContent += '<div class="text-[10px] text-slate-400 text-center">+' + (dayAppointments.length - 2) + ' más</div>';
+                    }
+                    htmlContent += '</div>';
+                }
+
+                cell.innerHTML = htmlContent;
+                grid.appendChild(cell);
+            }
+        }
+
+        function formatDateStr(year, month, day) {
+            return year + '-' + String(month + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+        }
+
+        function changeMonth(delta) {
+            currentMonth += delta;
+            if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+            if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+            renderCalendar();
+        }
+
+        function goToToday() {
+            var now = new Date();
+            currentMonth = now.getMonth();
+            currentYear = now.getFullYear();
+            renderCalendar();
+        }
+
+        function renderAppointmentsList() {
+            var container = document.getElementById('appointmentsList');
+            var paginationContainer = document.getElementById('appointmentsPagination');
+            var today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            var upcoming = appointments.filter(function(a) {
+                var aptDate = new Date(a.fecha + 'T' + (a.hora || '00:00'));
+                return aptDate >= today;
+            }).sort(function(a, b) {
+                return new Date(a.fecha + 'T' + a.hora) - new Date(b.fecha + 'T' + b.hora);
+            });
+
+            document.getElementById('totalCitas').textContent = appointments.length + ' citas';
+
+            if (upcoming.length === 0) {
+                container.innerHTML = '<div class="text-center py-8 text-slate-400"><svg class="w-12 h-12 mx-auto mb-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg><p class="text-sm">No hay citas programadas</p><p class="text-xs text-slate-300 mt-1">Haz clic en "Nueva Cita" para crear una</p></div>';
+                if (paginationContainer) {
+                    paginationContainer.classList.add('hidden');
+                    paginationContainer.innerHTML = '';
+                }
+                updateStats(0, 0, 0, 0);
+                return;
+            }
+
+            var totalPages = Math.max(1, Math.ceil(upcoming.length / appointmentsPerPage));
+            if (currentAppointmentsPage > totalPages) currentAppointmentsPage = totalPages;
+            if (currentAppointmentsPage < 1) currentAppointmentsPage = 1;
+
+            var startIndex = (currentAppointmentsPage - 1) * appointmentsPerPage;
+            var endIndex = startIndex + appointmentsPerPage;
+            var paginatedUpcoming = upcoming.slice(startIndex, endIndex);
+
+            var html = '';
+            var colors = [
+                { bg: 'bg-blue-50', border: 'border-l-blue-500', icon: 'text-blue-500' },
+                { bg: 'bg-green-50', border: 'border-l-green-500', icon: 'text-green-500' },
+                { bg: 'bg-purple-50', border: 'border-l-purple-500', icon: 'text-purple-500' },
+                { bg: 'bg-amber-50', border: 'border-l-amber-500', icon: 'text-amber-500' },
+                { bg: 'bg-rose-50', border: 'border-l-rose-500', icon: 'text-rose-500' },
+                { bg: 'bg-teal-50', border: 'border-l-teal-500', icon: 'text-teal-500' }
+            ];
+
+            var k, apt, color, isToday, notifBadges, j, n, unitText;
+            for (k = 0; k < paginatedUpcoming.length; k++) {
+                apt = paginatedUpcoming[k];
+                color = colors[k % colors.length];
+                isToday = (apt.fecha === formatDateStr(today.getFullYear(), today.getMonth(), today.getDate()));
+
+                notifBadges = '';
+                if (apt.notificaciones && apt.notificaciones.length > 0) {
+                    for (j = 0; j < apt.notificaciones.length; j++) {
+                        n = apt.notificaciones[j];
+                        unitText = n.unit === 'minutes' ? 'min' : n.unit === 'hours' ? 'h' : 'd';
+                        notifBadges += '<span class="notification-badge">' + n.value + unitText + '</span>';
+                    }
+                }
+
+                html += '<div class="card-hover ' + color.bg + ' border-l-4 ' + color.border + ' rounded-xl p-4 fade-in">';
+                html += '<div class="flex items-start justify-between">';
+                html += '<div class="flex-1 min-w-0">';
+                html += '<div class="flex items-center gap-2 mb-1">';
+                html += '<h4 class="font-semibold text-slate-800 truncate">' + apt.descripcion + '</h4>';
+                if (isToday) {
+                    html += '<span class="bg-medical-500 text-white text-[10px] px-2 py-0.5 rounded-full font-semibold">HOY</span>';
+                }
+                html += '</div>';
+                html += '<div class="flex items-center gap-3 text-xs text-slate-500 mb-2">';
+                html += '<span class="flex items-center gap-1"><svg class="w-3.5 h-3.5 ' + color.icon + '" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>' + formatDateDisplay(apt.fecha) + '</span>';
+                html += '<span class="flex items-center gap-1"><svg class="w-3.5 h-3.5 ' + color.icon + '" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>' + apt.hora + '</span>';
+                html += '</div>';
+                if (apt.ubicacion) {
+                    html += '<p class="text-xs text-slate-400 flex items-center gap-1 mb-2"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>' + apt.ubicacion + '</p>';
+                }
+                if (notifBadges) {
+                    html += '<div class="flex flex-wrap gap-1">' + notifBadges + '</div>';
+                }
+                html += '</div>';
+                html += '<div class="flex gap-1 ml-2">';
+                html += '<button onclick="editAppointment(\'' + apt.id + '\')" class="p-2 hover:bg-white rounded-lg transition-colors group" title="Editar"><svg class="w-4 h-4 text-slate-400 group-hover:text-medical-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>';
+                html += '<button onclick="confirmDelete(\'' + apt.id + '\')" class="p-2 hover:bg-white rounded-lg transition-colors group" title="Eliminar"><svg class="w-4 h-4 text-slate-400 group-hover:text-red-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>';
+                html += '</div></div></div>';
+            }
+
+            container.innerHTML = html;
+
+            if (paginationContainer) {
+                if (totalPages <= 1) {
+                    paginationContainer.classList.add('hidden');
+                    paginationContainer.innerHTML = '';
+                } else {
+                    paginationContainer.classList.remove('hidden');
+                    paginationContainer.classList.add('flex');
+                    paginationContainer.innerHTML =
+                        '<div class="flex items-center gap-2">' +
+                        '<label for="appointmentsPerPage" class="text-xs text-slate-500">Por página</label>' +
+                        '<select id="appointmentsPerPage" onchange="setAppointmentsPerPage(this.value)" class="px-2 py-1 rounded-lg border border-slate-300 text-xs text-slate-700 bg-white">' +
+                        '<option value="5"' + (appointmentsPerPage === 5 ? ' selected' : '') + '>5</option>' +
+                        '<option value="10"' + (appointmentsPerPage === 10 ? ' selected' : '') + '>10</option>' +
+                        '<option value="20"' + (appointmentsPerPage === 20 ? ' selected' : '') + '>20</option>' +
+                        '</select>' +
+                        '</div>' +
+                        '<div class="flex items-center gap-2">' +
+                        '<button onclick="goToAppointmentsPage(1)" ' +
+                        (currentAppointmentsPage === 1 ? 'disabled ' : '') +
+                        'class="px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition ' +
+                        (currentAppointmentsPage === 1
+                            ? 'border-slate-200 text-slate-300 cursor-not-allowed'
+                            : 'border-slate-300 text-slate-600 hover:bg-slate-50') +
+                        '">Primera</button>' +
+                        '<button onclick="changeAppointmentsPage(-1)" ' +
+                        (currentAppointmentsPage === 1 ? 'disabled ' : '') +
+                        'class="px-3 py-1.5 rounded-lg border text-xs font-semibold transition ' +
+                        (currentAppointmentsPage === 1
+                            ? 'border-slate-200 text-slate-300 cursor-not-allowed'
+                            : 'border-slate-300 text-slate-600 hover:bg-slate-50') +
+                        '">Anterior</button>' +
+                        '<span class="text-xs text-slate-500">Página ' + currentAppointmentsPage + ' de ' + totalPages + '</span>' +
+                        '<button onclick="changeAppointmentsPage(1)" ' +
+                        (currentAppointmentsPage === totalPages ? 'disabled ' : '') +
+                        'class="px-3 py-1.5 rounded-lg border text-xs font-semibold transition ' +
+                        (currentAppointmentsPage === totalPages
+                            ? 'border-slate-200 text-slate-300 cursor-not-allowed'
+                            : 'border-slate-300 text-slate-600 hover:bg-slate-50') +
+                        '">Siguiente</button>' +
+                        '<button onclick="goToAppointmentsPage(' + totalPages + ')" ' +
+                        (currentAppointmentsPage === totalPages ? 'disabled ' : '') +
+                        'class="px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition ' +
+                        (currentAppointmentsPage === totalPages
+                            ? 'border-slate-200 text-slate-300 cursor-not-allowed'
+                            : 'border-slate-300 text-slate-600 hover:bg-slate-50') +
+                        '">Última</button>' +
+                        '</div>';
+                }
+            }
+
+            var todayStr = formatDateStr(today.getFullYear(), today.getMonth(), today.getDate());
+            var todayCount = appointments.filter(function(a) { return a.fecha === todayStr; }).length;
+            var passed = appointments.filter(function(a) {
+                var aptDate = new Date(a.fecha + 'T' + (a.hora || '23:59'));
+                return aptDate < today;
+            }).length;
+            updateStats(appointments.length, upcoming.length, todayCount, passed);
+        }
+
+        function changeAppointmentsPage(delta) {
+            currentAppointmentsPage += delta;
+            renderAppointmentsList();
+        }
+
+        function goToAppointmentsPage(page) {
+            currentAppointmentsPage = page;
+            renderAppointmentsList();
+        }
+
+        function setAppointmentsPerPage(value) {
+            var parsed = parseInt(value, 10);
+            if (!parsed || [5, 10, 20].indexOf(parsed) === -1) return;
+            appointmentsPerPage = parsed;
+            currentAppointmentsPage = 1;
+            renderAppointmentsList();
+        }
+
+        function formatDateDisplay(dateStr) {
+            var parts = dateStr.split('-');
+            var month = monthNames[parseInt(parts[1]) - 1];
+            return parseInt(parts[2]) + ' ' + month + ' ' + parts[0];
+        }
+
+        function updateStats(total, upcoming, today, passed) {
+            document.getElementById('statTotal').textContent = total;
+            document.getElementById('statUpcoming').textContent = upcoming;
+            document.getElementById('statToday').textContent = today;
+            document.getElementById('statPassed').textContent = passed;
+        }
+
+        // ===== MODAL HANDLERS =====
+        function handleNewAppointment() {
+            openCreateModal(null, null);
+        }
+
+        function openCreateModal(apt, dateStr) {
+            var form = document.getElementById('appointmentForm');
+            form.reset();
+
+            // Set default notification
+            document.getElementById('notificationsContainer').innerHTML = createNotificationHTML(30, 'minutes');
+
+            if (apt) {
+                // Edit mode
+                document.getElementById('modalTitle').textContent = 'Editar Cita Médica';
+                document.getElementById('modalIcon').innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>';
+                document.getElementById('submitText').textContent = 'Guardar Cambios';
+                document.getElementById('btnDelete').classList.remove('hidden');
+
+                document.getElementById('appointmentId').value = apt.id;
+                document.getElementById('googleEventId').value = apt.googleEventId || '';
+                document.getElementById('descripcion').value = apt.descripcion;
+                document.getElementById('fecha').value = apt.fecha;
+                document.getElementById('hora').value = apt.hora;
+                document.getElementById('ubicacion').value = apt.ubicacion || '';
+
+                var container = document.getElementById('notificationsContainer');
+                container.innerHTML = '';
+                if (apt.notificaciones && apt.notificaciones.length > 0) {
+                    apt.notificaciones.forEach(function(n) {
+                        container.innerHTML += createNotificationHTML(n.value, n.unit);
+                    });
+                }
+            } else {
+                // Create mode
+                document.getElementById('modalTitle').textContent = 'Nueva Cita Médica';
+                document.getElementById('modalIcon').innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>';
+                document.getElementById('submitText').textContent = 'Crear Cita';
+                document.getElementById('btnDelete').classList.add('hidden');
+                document.getElementById('appointmentId').value = '';
+                document.getElementById('googleEventId').value = '';
+
+                if (dateStr) {
+                    document.getElementById('fecha').value = dateStr;
+                } else {
+                    var now = new Date();
+                    document.getElementById('fecha').value = formatDateStr(now.getFullYear(), now.getMonth(), now.getDate());
+                }
+            }
+
+            document.getElementById('appointmentModal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('appointmentModal').classList.add('hidden');
+        }
+
+        function createNotificationHTML(value, unit) {
+            var html = '<div class="flex gap-2 items-center">';
+            html += '<input type="number" min="1" value="' + value + '" class="w-20 px-3 py-2 rounded-lg border border-slate-200 focus:border-medical-400 focus:ring-2 focus:ring-medical-100 outline-none text-sm notification-value">';
+            html += '<select class="flex-1 px-3 py-2 rounded-lg border border-slate-200 focus:border-medical-400 focus:ring-2 focus:ring-medical-100 outline-none text-sm notification-unit">';
+            html += '<option value="minutes"' + (unit === 'minutes' ? ' selected' : '') + '>Minutos antes</option>';
+            html += '<option value="hours"' + (unit === 'hours' ? ' selected' : '') + '>Horas antes</option>';
+            html += '<option value="days"' + (unit === 'days' ? ' selected' : '') + '>Días antes</option>';
+            html += '</select>';
+            html += '<button type="button" onclick="removeNotification(this)" class="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">';
+            html += '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>';
+            html += '</button></div>';
+            return html;
+        }
+
+        function addNotification() {
+            var container = document.getElementById('notificationsContainer');
+            var div = document.createElement('div');
+            div.className = 'flex gap-2 items-center fade-in';
+            div.innerHTML = createNotificationHTML(1, 'days');
+            container.appendChild(div);
+        }
+
+        function removeNotification(btn) {
+            var container = document.getElementById('notificationsContainer');
+            if (container.children.length > 1) {
+                btn.closest('.flex').remove();
+            }
+        }
+
+        // ===== FORM SUBMIT =====
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+
+            var id = document.getElementById('appointmentId').value;
+            var googleEventId = document.getElementById('googleEventId').value;
+            var descripcion = document.getElementById('descripcion').value.trim();
+            var fecha = document.getElementById('fecha').value;
+            var hora = document.getElementById('hora').value;
+            var ubicacion = document.getElementById('ubicacion').value.trim();
+
+            var notificaciones = [];
+            var notifContainers = document.getElementById('notificationsContainer').children;
+            for (var i = 0; i < notifContainers.length; i++) {
+                var val = parseInt(notifContainers[i].querySelector('.notification-value').value);
+                var unit = notifContainers[i].querySelector('.notification-unit').value;
+                if (val && val > 0) {
+                    notificaciones.push({ value: val, unit: unit });
+                }
+            }
+
+            if (id) {
+                // Update
+                var index = -1;
+                for (var j = 0; j < appointments.length; j++) {
+                    if (appointments[j].id === id) {
+                        index = j;
+                        break;
+                    }
+                }
+                if (index !== -1) {
+                    appointments[index].descripcion = descripcion;
+                    appointments[index].fecha = fecha;
+                    appointments[index].hora = hora;
+                    appointments[index].ubicacion = ubicacion;
+                    appointments[index].notificaciones = notificaciones;
+                    showToast('Cita Actualizada', 'Los cambios se han guardado correctamente', 'success');
+                    if (googleEventId || isGoogleConnected || localStorage.getItem('gcal_clientId')) {
+                        try {
+                            await updateRemoteEventForAppointment(appointments[index]);
+                        } catch (err) {
+                            showToast(
+                                'Actualización parcial',
+                                (err && err.message) ? err.message : 'La cita se actualizó localmente, pero no en Google Calendar.',
+                                'warning'
+                            );
+                        }
+                    }
+                }
+            } else {
+                // Create
+                var newAppointment = {
+                    id: 'apt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                    googleEventId: '',
+                    descripcion: descripcion,
+                    fecha: fecha,
+                    hora: hora,
+                    ubicacion: ubicacion,
+                    notificaciones: notificaciones,
+                    createdAt: new Date().toISOString()
+                };
+                appointments.push(newAppointment);
+                showToast('Cita Creada', 'La cita se ha programado correctamente', 'success');
+                if (isGoogleConnected) {
+                    createGoogleCalendarEvent(newAppointment);
+                }
+            }
+
+            saveAppointments();
+            renderCalendar();
+            renderAppointmentsList();
+            closeModal();
+        }
+
+        // ===== EDIT / DELETE =====
+        function editAppointment(id) {
+            var apt = null;
+            for (var i = 0; i < appointments.length; i++) {
+                if (appointments[i].id === id) {
+                    apt = appointments[i];
+                    break;
+                }
+            }
+            if (apt) {
+                openCreateModal(apt);
+            }
+        }
+
+        function handleDelete() {
+            var id = document.getElementById('appointmentId').value;
+            if (id) {
+                confirmDelete(id);
+                closeModal();
+            }
+        }
+
+        function confirmDelete(id) {
+            var apt = null;
+            for (var i = 0; i < appointments.length; i++) {
+                if (appointments[i].id === id) {
+                    apt = appointments[i];
+                    break;
+                }
+            }
+            if (!apt) return;
+
+            document.getElementById('confirmText').textContent = '¿Estás seguro de eliminar "' + apt.descripcion + '"? Esta acción no se puede deshacer.';
+            document.getElementById('btnConfirmDelete').onclick = async function() {
+                var deleted = await deleteAppointmentById(id);
+                if (deleted) {
+                    closeConfirm();
+                }
+            };
+            document.getElementById('confirmModal').classList.remove('hidden');
+        }
+
+        function closeConfirm() {
+            document.getElementById('confirmModal').classList.add('hidden');
+        }
+
+        async function deleteAppointmentById(id) {
+            var apt = null;
+            for (var i = 0; i < appointments.length; i++) {
+                if (appointments[i].id === id) {
+                    apt = appointments[i];
+                    break;
+                }
+            }
+
+            if (!apt) return false;
+
+            // Si hay conexión o la cita parece venir de Google, intentamos borrado remoto antes del local.
+            if (apt.googleEventId || isGoogleConnected) {
+                try {
+                    await deleteRemoteEventForAppointment(apt);
+                } catch (err) {
+                    showToast(
+                        'No se pudo eliminar en Google',
+                        (err && err.message) ? err.message : 'La cita no fue eliminada del calendario remoto.',
+                        'error'
+                    );
+                    return false;
+                }
+            }
+
+            appointments = appointments.filter(function(a) { return a.id !== id; });
+            saveAppointments();
+            renderCalendar();
+            renderAppointmentsList();
+            showToast('Cita Eliminada', 'La cita ha sido eliminada correctamente', 'info');
+            return true;
+        }
+
+        function ensureGoogleSession() {
+            return new Promise(function(resolve, reject) {
+                var apiKey = localStorage.getItem('gcal_apiKey');
+                var clientId = localStorage.getItem('gcal_clientId');
+
+                if (!apiKey || !clientId) {
+                    return reject(new Error('Faltan credenciales de Google (API Key / Client ID).'));
+                }
+
+                function withToken() {
+                    try {
+                        var existingToken = gapi.client.getToken();
+                        if (existingToken && existingToken.access_token) {
+                            isGoogleConnected = true;
+                            gisAccessToken = existingToken.access_token;
+                            return resolve();
+                        }
+                    } catch (e) {
+                        // seguimos y pedimos token
+                    }
+
+                    function requestToken() {
+                        if (!gisTokenClient) {
+                            gisTokenClient = google.accounts.oauth2.initTokenClient({
+                                client_id: clientId,
+                                scope: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly',
+                                callback: function(resp) {
+                                    if (!resp || resp.error) {
+                                        return reject(new Error((resp && (resp.error_description || resp.error)) || 'No se pudo obtener token de Google.'));
+                                    }
+                                    gisAccessToken = resp.access_token;
+                                    gapi.client.setToken({ access_token: resp.access_token });
+                                    isGoogleConnected = true;
+                                    resolve();
+                                }
+                            });
+                        }
+
+                        // prompt vacío intenta sesión silenciosa; si Google requiere interacción, mostrará el flujo correspondiente.
+                        gisTokenClient.requestAccessToken({ prompt: '' });
+                    }
+
+                    requestToken();
+                }
+
+                if (gapiInitialized) {
+                    return withToken();
+                }
+
+                gapi.load('client', function() {
+                    gapi.client.init({
+                        apiKey: apiKey,
+                        discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest']
+                    }).then(function() {
+                        gapiInitialized = true;
+                        withToken();
+                    }).catch(function(err) {
+                        reject(new Error((err && err.message) || 'No se pudo inicializar Google API.'));
+                    });
+                });
+            });
+        }
+
+        function findMatchingGoogleEvent(apt) {
+            var startDateTime = apt.fecha + 'T' + apt.hora;
+            var endOfDay = new Date(apt.fecha + 'T23:59:59');
+            var startOfDay = new Date(apt.fecha + 'T00:00:00');
+
+            return gapi.client.calendar.events.list({
+                calendarId: 'primary',
+                timeMin: startOfDay.toISOString(),
+                timeMax: endOfDay.toISOString(),
+                showDeleted: false,
+                singleEvents: true,
+                q: apt.descripcion || ''
+            }).then(function(response) {
+                var items = (response && response.result && response.result.items) ? response.result.items : [];
+                var normalizedSummary = (apt.descripcion || '').trim().toLowerCase();
+                for (var i = 0; i < items.length; i++) {
+                    var ev = items[i];
+                    var evStart = ev.start && (ev.start.dateTime || ev.start.date);
+                    if (!evStart) continue;
+
+                    var evDate = evStart.split('T')[0];
+                    var evTime = '00:00';
+                    if (evStart.indexOf('T') !== -1) {
+                        var d = new Date(evStart);
+                        evTime = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+                    }
+
+                    var sameDate = evDate === apt.fecha;
+                    var sameTime = evTime === apt.hora;
+                    var sameSummary = (ev.summary || '').trim().toLowerCase() === normalizedSummary;
+
+                    if (sameDate && ((sameTime && sameSummary) || sameSummary || sameTime)) {
+                        return ev;
+                    }
+                }
+                return null;
+            });
+        }
+
+        function buildGoogleEventResource(apt) {
+            var startDate = new Date(apt.fecha + 'T' + apt.hora);
+            var endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
+            var startDateTimeLocal = apt.fecha + 'T' + String(startDate.getHours()).padStart(2, '0') + ':' + String(startDate.getMinutes()).padStart(2, '0') + ':00';
+            var endDateTimeLocal = apt.fecha + 'T' + String(endDate.getHours()).padStart(2, '0') + ':' + String(endDate.getMinutes()).padStart(2, '0') + ':00';
+
+            return {
+                summary: apt.descripcion,
+                location: apt.ubicacion || '',
+                description: 'Cita médica - ' + apt.descripcion + '\nFecha: ' + formatDateDisplay(apt.fecha) + '\nHora: ' + apt.hora,
+                start: { dateTime: startDateTimeLocal, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+                end: { dateTime: endDateTimeLocal, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+                reminders: {
+                    useDefault: false,
+                    overrides: (apt.notificaciones || []).map(function(n) {
+                        var minutes = n.value;
+                        if (n.unit === 'hours') minutes *= 60;
+                        if (n.unit === 'days') minutes *= 1440;
+                        return { method: 'popup', minutes: minutes };
+                    })
+                }
+            };
+        }
+
+        function updateRemoteEventForAppointment(apt) {
+            return ensureGoogleSession().then(function() {
+                if (apt.googleEventId) {
+                    return updateGoogleCalendarEvent(apt.googleEventId, apt).catch(function(err) {
+                        var msg = (err && err.message) ? err.message.toLowerCase() : '';
+                        var notFound = msg.indexOf('not found') !== -1 || msg.indexOf('no encontrado') !== -1 || msg.indexOf('404') !== -1;
+                        if (!notFound) {
+                            return Promise.reject(err);
+                        }
+
+                        return findMatchingGoogleEvent(apt).then(function(match) {
+                            if (!match) {
+                                return Promise.reject(new Error('No se encontró el evento en Google para actualizar esta cita.'));
+                            }
+                            apt.googleEventId = match.id;
+                            return updateGoogleCalendarEvent(match.id, apt);
+                        });
+                    });
+                }
+
+                return findMatchingGoogleEvent(apt).then(function(match) {
+                    if (!match) {
+                        return Promise.reject(new Error('La cita no tiene vínculo con Google Calendar.'));
+                    }
+                    apt.googleEventId = match.id;
+                    return updateGoogleCalendarEvent(match.id, apt);
+                });
+            });
+        }
+
+        function deleteRemoteEventForAppointment(apt) {
+            return ensureGoogleSession().then(function() {
+                if (apt.googleEventId) {
+                    return deleteGoogleCalendarEvent(apt.googleEventId).catch(function(err) {
+                        var msg = (err && err.message) ? err.message.toLowerCase() : '';
+                        var notFound = msg.indexOf('not found') !== -1 || msg.indexOf('no encontrado') !== -1 || msg.indexOf('404') !== -1;
+                        if (!notFound) {
+                            return Promise.reject(err);
+                        }
+
+                        // fallback: si el id remoto ya no es válido, buscamos por fecha/hora/descripcion
+                        return findMatchingGoogleEvent(apt).then(function(match) {
+                            if (!match) {
+                                return Promise.reject(new Error('No se encontró el evento en Google Calendar para esta cita.'));
+                            }
+                            apt.googleEventId = match.id;
+                            return deleteGoogleCalendarEvent(match.id);
+                        });
+                    });
+                }
+
+                // citas antiguas sin googleEventId: intentamos localizar por datos básicos
+                return findMatchingGoogleEvent(apt).then(function(match) {
+                    if (!match) {
+                        return Promise.reject(new Error('Esta cita no tiene ID de Google vinculado y no se encontró coincidencia remota.'));
+                    }
+                    apt.googleEventId = match.id;
+                    return deleteGoogleCalendarEvent(match.id);
+                });
+            });
+        }
+
+        function saveAppointments() {
+            localStorage.setItem('medicalAppointments', JSON.stringify(appointments));
+        }
+
+        // ===== GOOGLE CALENDAR (GIS + GAPI) =====
+        function handleSyncClick() {
+            if (isGoogleConnected) {
+                showToast('Sincronizando', 'Actualizando citas desde y hacia Google Calendar', 'info');
+                syncAndFetchAllAppointments().then(function(result) {
+                    renderCalendar();
+                    renderAppointmentsList();
+                    showToast(
+                        'Sincronización completada',
+                        'Subidas: ' + result.push.success + ', descargadas nuevas: ' + result.pull.added + ', actualizadas: ' + result.pull.updated,
+                        result.push.failed > 0 ? 'warning' : 'success'
+                    );
+                }).catch(function(err) {
+                    showToast('Error de sincronización', (err && err.message) ? err.message : 'No se pudo sincronizar con Google', 'error');
+                });
+            } else {
+                showAuthModal();
+            }
+        }
+
+        function showAuthModal() {
+            document.getElementById('authContent').classList.remove('hidden');
+            document.getElementById('authLoading').classList.add('hidden');
+            document.getElementById('authMessage').classList.add('hidden');
+            document.getElementById('btnConnectText').textContent = 'Conectar con Google';
+            document.getElementById('btnConnectGoogle').disabled = false;
+
+            var apiKey = localStorage.getItem('gcal_apiKey');
+            var clientId = localStorage.getItem('gcal_clientId');
+
+            if (!apiKey || !clientId) {
+                updateStep(1, 'pending');
+                updateStep(2, 'pending');
+                updateStep(3, 'pending');
+                showAuthMessage('warning', '⚠️ No hay credenciales configuradas. Haz clic en "Configurar credenciales" para añadir tu API Key y Client ID.');
+            } else {
+                updateStep(1, 'done');
+                updateStep(2, 'pending');
+                updateStep(3, 'pending');
+            }
+
+            document.getElementById('authModal').classList.remove('hidden');
+        }
+
+        function closeAuthModal() {
+            document.getElementById('authModal').classList.add('hidden');
+        }
+
+        function showAuthMessage(type, message) {
+            var msgEl = document.getElementById('authMessage');
+            msgEl.classList.remove('hidden');
+            var styles = {
+                error: 'bg-red-50 border border-red-200 text-red-700',
+                success: 'bg-green-50 border border-green-200 text-green-700',
+                warning: 'bg-amber-50 border border-amber-200 text-amber-700',
+                info: 'bg-blue-50 border border-blue-200 text-blue-700'
+            };
+            msgEl.className = 'p-4 rounded-xl fade-in border text-sm ' + (styles[type] || styles.info);
+            msgEl.innerHTML = message;
+        }
+
+        function updateStep(stepNum, state) {
+            var indicator = document.getElementById('step' + stepNum + 'Indicator');
+            indicator.className = 'step-indicator step-' + state;
+            indicator.innerHTML = state === 'done' ? '✓' : stepNum;
+        }
+
+        function startGoogleAuth() {
+            var apiKey = localStorage.getItem('gcal_apiKey');
+            var clientId = localStorage.getItem('gcal_clientId');
+
+            if (!apiKey || !clientId) {
+                showAuthMessage('error', '❌ Faltan las credenciales. Configura tu API Key y Client ID primero.');
+                return;
+            }
+
+            document.getElementById('authContent').classList.add('hidden');
+            document.getElementById('authLoading').classList.remove('hidden');
+            document.getElementById('authLoadingText').textContent = 'Inicializando Google API...';
+            updateStep(1, 'active');
+
+            // Check GIS is loaded
+            if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
+                var retries = 0;
+                var checkInterval = setInterval(function() {
+                    retries++;
+                    if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
+                        clearInterval(checkInterval);
+                        proceedWithGoogleAuth(apiKey, clientId);
+                    }
+                    if (retries > 100) {
+                        clearInterval(checkInterval);
+                        showContentState();
+                        showAuthMessage('error', '❌ La librería GIS no se cargó. Verifica tu conexión a internet.');
+                        updateStep(1, 'pending');
+                    }
+                }, 100);
+            } else {
+                proceedWithGoogleAuth(apiKey, clientId);
+            }
+        }
+
+        function proceedWithGoogleAuth(apiKey, clientId) {
+            gapi.load('client', function() {
+                gapi.client.init({
+                    apiKey: apiKey,
+                    discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest']
+                }).then(function() {
+                    gapiInitialized = true;
+                    updateStep(1, 'done');
+                    updateStep(2, 'active');
+                    document.getElementById('authLoadingText').textContent = 'Abriendo ventana de autorización...';
+
+                    gisTokenClient = google.accounts.oauth2.initTokenClient({
+                        client_id: clientId,
+                        scope: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly',
+                        prompt: 'select_account',
+                        callback: function(response) {
+                            if (response.error) {
+                                showContentState();
+                                showAuthMessage('error', '❌ Error de autorización: ' + (response.error_description || 'Acceso denegado.'));
+                                updateStep(2, 'pending');
+                                return;
+                            }
+
+                            gisAccessToken = response.access_token;
+                            gapi.client.setToken({ access_token: response.access_token });
+                            isGoogleConnected = true;
+
+                            updateStep(2, 'done');
+                            updateStep(3, 'active');
+                            document.getElementById('authLoadingText').textContent = 'Sincronizando citas...';
+
+                            syncAndFetchAllAppointments().then(function(result) {
+                                updateStep(3, 'done');
+                                document.getElementById('btnSyncConnected').classList.remove('hidden');
+                                document.getElementById('btnSyncText').textContent = 'Conectado';
+
+                                renderCalendar();
+                                renderAppointmentsList();
+
+                                if (result && result.push && result.push.failed > 0) {
+                                    showContentState();
+                                    showAuthMessage(
+                                        'warning',
+                                        '⚠️ Autorización exitosa, pero ' + result.push.failed + ' cita(s) no se pudieron sincronizar. ' +
+                                        (result.push.firstError ? ('Detalle: ' + result.push.firstError) : '')
+                                    );
+                                    return;
+                                }
+
+                                setTimeout(function() {
+                                    closeAuthModal();
+                                    showToast(
+                                        'Conectado',
+                                        'Google Calendar sincronizado. Nuevas desde Google: ' + result.pull.added + ', actualizadas: ' + result.pull.updated,
+                                        'success'
+                                    );
+                                }, 1200);
+                            }).catch(function(err) {
+                                showContentState();
+                                showAuthMessage(
+                                    'warning',
+                                    '⚠️ Autorización exitosa, pero hubo un error al sincronizar. ' +
+                                    (err && err.message ? ('Detalle: ' + err.message) : '')
+                                );
+                                updateStep(3, 'done');
+                                setTimeout(function() { closeAuthModal(); }, 2000);
+                            });
+                        }
+                    });
+
+                    gisTokenClient.requestAccessToken();
+                }).catch(function(err) {
+                    showContentState();
+                    showAuthMessage('error', '❌ Error al inicializar GAPI: ' + (err.message || 'Error desconocido'));
+                    updateStep(1, 'pending');
+                });
+            });
+        }
+
+        function showContentState() {
+            document.getElementById('authLoading').classList.add('hidden');
+            document.getElementById('authContent').classList.remove('hidden');
+        }
+
+        function syncAllAppointments() {
+            var unsynced = appointments.filter(function(a) { return !a.googleEventId; });
+            if (unsynced.length === 0) {
+                return Promise.resolve({ total: 0, success: 0, failed: 0, firstError: '' });
+            }
+
+            var promises = unsynced.map(function(apt) {
+                return createGoogleCalendarEvent(apt);
+            });
+
+            return Promise.allSettled(promises).then(function(results) {
+                var failed = 0;
+                var success = 0;
+                var firstError = '';
+
+                results.forEach(function(r) {
+                    if (r.status === 'fulfilled') {
+                        success++;
+                    } else {
+                        failed++;
+                        if (!firstError) {
+                            firstError = (r.reason && r.reason.message) ? r.reason.message : 'Error desconocido en Google Calendar';
+                        }
+                    }
+                });
+
+                return {
+                    total: results.length,
+                    success: success,
+                    failed: failed,
+                    firstError: firstError
+                };
+            });
+        }
+
+        function syncAndFetchAllAppointments() {
+            return syncAllAppointments().then(function(pushResult) {
+                return fetchGoogleCalendarEvents().then(function(pullResult) {
+                    return { push: pushResult, pull: pullResult };
+                });
+            });
+        }
+
+        function fetchGoogleCalendarEvents() {
+            if (!isGoogleConnected || !gapiInitialized) {
+                return Promise.resolve({ added: 0, updated: 0, totalRemote: 0 });
+            }
+
+            var now = new Date();
+            var timeMin = new Date(now.getFullYear(), 0, 1).toISOString();
+
+            return gapi.client.calendar.events.list({
+                calendarId: 'primary',
+                timeMin: timeMin,
+                showDeleted: false,
+                singleEvents: true,
+                orderBy: 'startTime',
+                maxResults: 2500
+            }).then(function(response) {
+                var items = (response && response.result && response.result.items) ? response.result.items : [];
+                var added = 0;
+                var updated = 0;
+
+                items.forEach(function(event) {
+                    var startRaw = event.start && (event.start.dateTime || event.start.date);
+                    if (!startRaw) return;
+
+                    var datePart = startRaw.split('T')[0];
+                    var timePart = '00:00';
+                    if (startRaw.indexOf('T') !== -1) {
+                        var dt = new Date(startRaw);
+                        timePart = String(dt.getHours()).padStart(2, '0') + ':' + String(dt.getMinutes()).padStart(2, '0');
+                    }
+
+                    var notificaciones = [];
+                    if (event.reminders && event.reminders.overrides && event.reminders.overrides.length > 0) {
+                        notificaciones = event.reminders.overrides.map(function(r) {
+                            var mins = r.minutes || 0;
+                            if (mins % 1440 === 0) return { value: mins / 1440, unit: 'days' };
+                            if (mins % 60 === 0) return { value: mins / 60, unit: 'hours' };
+                            return { value: mins, unit: 'minutes' };
+                        });
+                    }
+
+                    var existingIndex = -1;
+                    for (var i = 0; i < appointments.length; i++) {
+                        if (appointments[i].googleEventId === event.id) {
+                            existingIndex = i;
+                            break;
+                        }
+                    }
+
+                    if (existingIndex === -1) {
+                        appointments.push({
+                            id: 'apt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                            googleEventId: event.id,
+                            descripcion: event.summary || 'Cita sin título',
+                            fecha: datePart,
+                            hora: timePart,
+                            ubicacion: event.location || '',
+                            notificaciones: notificaciones,
+                            createdAt: new Date().toISOString()
+                        });
+                        added++;
+                    } else {
+                        appointments[existingIndex].descripcion = event.summary || appointments[existingIndex].descripcion || 'Cita sin título';
+                        appointments[existingIndex].fecha = datePart;
+                        appointments[existingIndex].hora = timePart;
+                        appointments[existingIndex].ubicacion = event.location || '';
+                        appointments[existingIndex].notificaciones = notificaciones;
+                        updated++;
+                    }
+                });
+
+                saveAppointments();
+                return { added: added, updated: updated, totalRemote: items.length };
+            }).catch(function(err) {
+                var errorMessage =
+                    (err && err.result && err.result.error && err.result.error.message) ||
+                    (err && err.message) ||
+                    'No se pudieron descargar los eventos de Google Calendar';
+                return Promise.reject(new Error(errorMessage));
+            });
+        }
+
+        function createGoogleCalendarEvent(apt) {
+            try {
+                var startDate = apt.fecha + 'T' + apt.hora;
+                var endDate = new Date(startDate);
+                endDate.setHours(endDate.getHours() + 1);
+                var endDateTimeLocal = apt.fecha + 'T' + String(endDate.getHours()).padStart(2, '0') + ':' + String(endDate.getMinutes()).padStart(2, '0') + ':00';
+
+                var event = {
+                    summary: apt.descripcion,
+                    location: apt.ubicacion || '',
+                    description: 'Cita médica - ' + apt.descripcion + '\nFecha: ' + formatDateDisplay(apt.fecha) + '\nHora: ' + apt.hora,
+                    start: { dateTime: startDate + ':00', timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+                    end: { dateTime: endDateTimeLocal, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+                    reminders: {
+                        useDefault: false,
+                        overrides: (apt.notificaciones || []).map(function(n) {
+                            var minutes = n.value;
+                            if (n.unit === 'hours') minutes *= 60;
+                            if (n.unit === 'days') minutes *= 1440;
+                            return { method: 'popup', minutes: minutes };
+                        })
+                    }
+                };
+
+                return gapi.client.calendar.events.insert({
+                    calendarId: 'primary',
+                    resource: event
+                }).then(function(response) {
+                    var index = -1;
+                    for (var i = 0; i < appointments.length; i++) {
+                        if (appointments[i].id === apt.id) {
+                            index = i;
+                            break;
+                        }
+                    }
+                    if (index !== -1) {
+                        appointments[index].googleEventId = response.result.id;
+                        saveAppointments();
+                    }
+                }, function(err) {
+                    var errorMessage =
+                        (err && err.result && err.result.error && err.result.error.message) ||
+                        (err && err.message) ||
+                        'No se pudo crear el evento en Google Calendar';
+                    return Promise.reject(new Error('Cita "' + (apt.descripcion || 'Sin título') + '": ' + errorMessage));
+                });
+            } catch (err) {
+                console.error('Error creating event:', err);
+                return Promise.reject(new Error('Error preparando la cita "' + (apt.descripcion || 'Sin título') + '" para sincronizar.'));
+            }
+        }
+
+        function updateGoogleCalendarEvent(eventId, apt) {
+            try {
+                var event = buildGoogleEventResource(apt);
+
+                return gapi.client.calendar.events.update({
+                    calendarId: 'primary',
+                    eventId: eventId,
+                    resource: event
+                }).then(function(response) {
+                    return response;
+                }, function(err) {
+                    var errorMessage =
+                        (err && err.result && err.result.error && err.result.error.message) ||
+                        (err && err.message) ||
+                        'No se pudo actualizar el evento en Google Calendar';
+                    return Promise.reject(new Error(errorMessage));
+                });
+            } catch (err) {
+                console.error('Error updating event:', err);
+                return Promise.reject(new Error('No se pudo preparar la actualización del evento en Google Calendar.'));
+            }
+        }
+
+        function deleteGoogleCalendarEvent(eventId) {
+            try {
+                return gapi.client.calendar.events.delete({
+                    calendarId: 'primary',
+                    eventId: eventId
+                }).then(function(response) {
+                    return response;
+                }, function(err) {
+                    var errorMessage =
+                        (err && err.result && err.result.error && err.result.error.message) ||
+                        (err && err.message) ||
+                        'Error desconocido al eliminar en Google Calendar';
+                    return Promise.reject(new Error(errorMessage));
+                });
+            } catch (err) {
+                console.error('Error deleting event:', err);
+                return Promise.reject(new Error('No se pudo preparar la solicitud de eliminación en Google Calendar.'));
+            }
+        }
+
+        // ===== SETTINGS =====
+        function openSettings() {
+            document.getElementById('apiKey').value = localStorage.getItem('gcal_apiKey') || '';
+            document.getElementById('clientId').value = localStorage.getItem('gcal_clientId') || '';
+            document.getElementById('settingsMessage').classList.add('hidden');
+            document.getElementById('currentOrigin').textContent = window.location.origin;
+            document.getElementById('settingsPanel').classList.remove('hidden');
+        }
+
+        function closeSettings() {
+            document.getElementById('settingsPanel').classList.add('hidden');
+        }
+
+        function saveSettings() {
+            var apiKey = document.getElementById('apiKey').value.trim();
+            var clientId = document.getElementById('clientId').value.trim();
+
+            if (apiKey) localStorage.setItem('gcal_apiKey', apiKey);
+            if (clientId) localStorage.setItem('gcal_clientId', clientId);
+
+            var msgEl = document.getElementById('settingsMessage');
+            msgEl.classList.remove('hidden');
+            msgEl.className = 'p-4 rounded-xl fade-in border text-sm bg-green-50 border-green-200 text-green-700';
+            msgEl.innerHTML = '✅ Configuración guardada correctamente';
+
+            isGoogleConnected = false;
+            gisAccessToken = null;
+            document.getElementById('btnSyncConnected').classList.add('hidden');
+            document.getElementById('btnSyncText').textContent = 'Google Calendar';
+
+            setTimeout(function() { msgEl.classList.add('hidden'); }, 3000);
+        }
+
+        // ===== TOAST =====
+        function showToast(title, message, type) {
+            type = type || 'success';
+            var toast = document.getElementById('toast');
+            var toastIcon = document.getElementById('toastIcon');
+            document.getElementById('toastTitle').textContent = title;
+            document.getElementById('toastMessage').textContent = message;
+
+            var icons = {
+                success: { bg: 'bg-green-100', color: 'text-green-600', path: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>' },
+                error: { bg: 'bg-red-100', color: 'text-red-600', path: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>' },
+                warning: { bg: 'bg-amber-100', color: 'text-amber-600', path: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>' },
+                info: { bg: 'bg-blue-100', color: 'text-blue-600', path: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>' }
+            };
+
+            var icon = icons[type] || icons.success;
+            toastIcon.className = icon.bg + ' p-2 rounded-lg';
+            toastIcon.innerHTML = '<svg class="w-5 h-5 ' + icon.color + '" fill="none" stroke="currentColor" viewBox="0 0 24 24">' + icon.path + '</svg>';
+
+            toast.classList.remove('hidden');
+            setTimeout(function() { toast.classList.add('hidden'); }, 3500);
+        }
+
+        // ===== INIT =====
+        function init() {
+            renderCalendar();
+            renderAppointmentsList();
+        }
+
+        init();
+    </script>
+</body>
+</html>
+

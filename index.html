@@ -127,15 +127,35 @@
             </div>
 
             <!-- Listado de próximas citas en formato Tarjetas -->
-            <div>
-                <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Tus Citas Programadas</h3>
-                <div id="appointments-cards" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <!-- Tarjetas dinámicas -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                <h3 class="text-lg font-bold text-slate-800">Tus Citas Programadas</h3>
+                
+                <!-- BOTONES DE FILTRADO TIPO PESTAÑA -->
+                <div class="flex bg-slate-100 p-1 rounded-xl shadow-sm border border-slate-200/50 self-start sm:self-auto">
+                    <button id="btn-filter-proximas" onclick="cambiarFiltroCitas('proximas')" 
+                        class="px-3 py-1.5 text-xs font-semibold rounded-lg transition duration-200 bg-white text-indigo-600 shadow-sm">
+                        📅 Próximas
+                    </button>
+                    <button id="btn-filter-pasadas" onclick="cambiarFiltroCitas('pasadas')" 
+                        class="px-3 py-1.5 text-xs font-semibold rounded-lg transition duration-200 text-slate-600 hover:text-slate-800">
+                        ⌛ Pasadas
+                    </button>
+                    <button id="btn-filter-todas" onclick="cambiarFiltroCitas('todas')" 
+                        class="px-3 py-1.5 text-xs font-semibold rounded-lg transition duration-200 text-slate-600 hover:text-slate-800">
+                        ✨ Todas
+                    </button>
                 </div>
+            </div>
+
+            <!-- 🚀 ¡AQUÍ! Asegúrate de que el div contenedor tenga exactamente id="cards-container" -->
+            <div id="cards-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Las tarjetas se generarán dinámicamente aquí dentro -->
             </div>
         </section>
 
     </main>
+
+    <div id="toast-container" class="fixed top-4 right-4 z-[9999] flex w-[min(100%-2rem,22rem)] flex-col gap-3 pointer-events-none"></div>
 
     <!-- LÓGICA DE JAVASCRIPT -->
     <script>
@@ -151,12 +171,125 @@
         let currentReminders = [];
         let currentMonthDate = new Date();
 
+        // Variable global para controlar el filtro activo en las tarjetas
+let filtroCitasActual = 'proximas';
+
         // Elementos DOM
         const form = document.getElementById('appointment-form');
         const btnLogin = document.getElementById('btn-login');
         const btnLogout = document.getElementById('btn-logout');
         const notificationsList = document.getElementById('notifications-list');
         const cardsContainer = document.getElementById('appointments-cards');
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+
+            const variants = {
+                success: {
+                    icon: 'fa-circle-check',
+                    accent: 'border-emerald-200',
+                    iconBg: 'bg-emerald-500',
+                    title: 'text-emerald-700'
+                },
+                error: {
+                    icon: 'fa-triangle-exclamation',
+                    accent: 'border-rose-200',
+                    iconBg: 'bg-rose-500',
+                    title: 'text-rose-700'
+                },
+                warning: {
+                    icon: 'fa-circle-exclamation',
+                    accent: 'border-amber-200',
+                    iconBg: 'bg-amber-500',
+                    title: 'text-amber-700'
+                },
+                info: {
+                    icon: 'fa-circle-info',
+                    accent: 'border-slate-200',
+                    iconBg: 'bg-slate-600',
+                    title: 'text-slate-700'
+                }
+            };
+
+            const variant = variants[type] || variants.info;
+            const toast = document.createElement('div');
+            toast.className = `pointer-events-auto flex items-start gap-3 rounded-2xl border ${variant.accent} bg-white px-4 py-3 shadow-lg shadow-slate-200/60 transition-all duration-200 opacity-0 translate-y-2 scale-95`;
+            toast.innerHTML = `
+                <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${variant.iconBg} text-white">
+                    <i class="fa-solid ${variant.icon}"></i>
+                </div>
+                <div class="min-w-0 flex-1">
+                    <p class="text-sm font-medium ${variant.title}">${message}</p>
+                </div>
+                <button type="button" class="text-slate-400 hover:text-slate-600 transition" aria-label="Cerrar notificación">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            `;
+
+            const closeButton = toast.querySelector('button');
+            const removeToast = () => {
+                toast.classList.add('opacity-0', 'translate-y-2', 'scale-95');
+                window.setTimeout(() => toast.remove(), 180);
+            };
+
+            closeButton.onclick = removeToast;
+            container.appendChild(toast);
+            window.requestAnimationFrame(() => {
+                toast.classList.remove('opacity-0', 'translate-y-2', 'scale-95');
+            });
+            window.setTimeout(removeToast, type === 'error' ? 6000 : 3500);
+        }
+
+        // Muestra un diálogo de confirmación centrado con overlay oscuro
+        function showConfirm(message) {
+            return new Promise((resolve) => {
+                const overlay = document.createElement('div');
+                overlay.className = 'fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4';
+                overlay.innerHTML = `
+                    <div class="w-full max-w-md rounded-3xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/30 overflow-hidden">
+                        <div class="flex items-start gap-4 p-6">
+                            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-rose-500 text-white shadow-lg shadow-rose-200">
+                                <i class="fa-solid fa-triangle-exclamation text-lg"></i>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <h3 class="text-lg font-semibold text-slate-900">Confirmar eliminación</h3>
+                                <p class="mt-1 text-sm leading-6 text-slate-600">${message}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
+                            <button type="button" class="px-4 py-2 rounded-xl bg-white text-slate-700 border border-slate-200 text-sm font-medium shadow-sm hover:bg-slate-50 btn-cancel">Cancelar</button>
+                            <button type="button" class="px-4 py-2 rounded-xl bg-rose-600 text-white text-sm font-semibold shadow-sm hover:bg-rose-700 btn-confirm">Eliminar</button>
+                        </div>
+                    </div>
+                `;
+
+                const btnCancel = overlay.querySelector('.btn-cancel');
+                const btnConfirm = overlay.querySelector('.btn-confirm');
+
+                const cleanup = (result) => {
+                    overlay.remove();
+                    document.removeEventListener('keydown', handleKeydown);
+                    resolve(result);
+                };
+
+                const handleKeydown = (event) => {
+                    if (event.key === 'Escape') {
+                        cleanup(false);
+                    }
+                };
+
+                btnCancel.onclick = () => cleanup(false);
+                btnConfirm.onclick = () => cleanup(true);
+                overlay.addEventListener('click', (event) => {
+                    if (event.target === overlay) cleanup(false);
+                });
+
+                document.addEventListener('keydown', handleKeydown);
+                document.body.appendChild(overlay);
+                btnConfirm.focus();
+            });
+        }
 
         // --- AUTENTICACIÓN GOOGLE IDENTITY SERVICES ---
 
@@ -187,7 +320,7 @@
                     client_id: CLIENT_ID, // Usará el valor directo de la constante arriba declarada
                     scope: SCOPES,
                     error_callback: (err) => {
-                        alert("Google emitió un error de configuración:\n" + JSON.stringify(err));
+                        showToast("Google emitió un error de configuración: " + JSON.stringify(err), 'error');
                         console.error("Error detallado:", err);
                     },
                     callback: (resp) => {
@@ -224,7 +357,7 @@
         // Evento Seguro para el Botón Conectar Google
         btnLogin.onclick = () => {
             if (!tokenClient) {
-                alert("El servicio de Google aún está cargando o las credenciales CLIENT_ID son incorrectas. Por favor, revisa la consola del navegador (F12).");
+                showToast("El servicio de Google aún está cargando o las credenciales CLIENT_ID son incorrectas. Revisa la consola del navegador (F12).", 'warning');
                 return;
             }
             
@@ -241,11 +374,17 @@
                 google.accounts.oauth2.revoke(token.access_token, () => {});
                 gapi.client.setToken(null);
                 localStorage.removeItem('gcal_token');
+                localStorage.removeItem('med_appointments');
+                localAppointments = [];
+                currentReminders = [];
+                resetForm();
+                renderCalendar();
+                renderCards();
                 updateAuthUI(false);
             }
         };
 
-        function updateAuthUI(isLoggedIn) {
+/*         function updateAuthUI(isLoggedIn) {
             if (isLoggedIn) {
                 btnLogin.classList.add('hidden');
                 btnLogout.classList.remove('hidden');
@@ -253,11 +392,26 @@
                 btnLogin.classList.remove('hidden');
                 btnLogout.classList.add('hidden');
             }
+        } */
+
+
+        function updateAuthUI(isAuthenticated) {
+            if (isAuthenticated) {
+                if (btnLogin) btnLogin.classList.add('hidden');
+                if (btnLogout) btnLogout.classList.remove('hidden');
+                
+                // 🚀 ¡AQUÍ! Si está autenticado, descargamos inmediatamente los eventos reales
+                listUpcomingEvents();
+                
+            } else {
+                if (btnLogin) btnLogin.classList.remove('hidden');
+                if (btnLogout) btnLogout.classList.add('hidden');
+            }
         }
 
         function checkGoogleAuth() {
             if (!gapi.client.getToken()) {
-                alert("Por favor, conéctate a tu cuenta de Google primero usando el botón de 'Conectar Google' arriba a la derecha.");
+                showToast("Por favor, conéctate a tu cuenta de Google primero usando el botón de 'Conectar Google' arriba a la derecha.", 'warning');
                 return false;
             }
             return true;
@@ -350,15 +504,15 @@
                 };
                 localAppointments.push(newApp);
                 saveAndRefresh();
-                alert("¡Cita creada con éxito en la App y sincronizada en tu Google Calendar!");
+                showToast("¡Cita creada con éxito en la App y sincronizada en tu Google Calendar!", 'success');
             } catch (err) {
                 console.error("Error devuelto por Google Calendar API:", err);
-                alert("Error de Google Calendar:\n" + JSON.stringify(err.result || err));
+                showToast("Error de Google Calendar: " + JSON.stringify(err.result || err), 'error');
             }
         };
 
         // BOTÓN ACCIÓN: MODIFICAR CITA
-        document.getElementById('btn-update').onclick = async () => {
+/*         document.getElementById('btn-update').onclick = async () => {
             if (!checkGoogleAuth()) return;
             const id = document.getElementById('appointment-id').value;
             const gcalId = document.getElementById('gcal-event-id').value;
@@ -386,14 +540,130 @@
                 saveAndRefresh();
             } catch (err) {
                 console.error(err);
-                alert("Error al actualizar cambios en Google Calendar.");
+                showToast("Error al actualizar cambios en Google Calendar.", 'error');
+            }
+        }; */
+
+// BOTÓN ACCIÓN: MODIFICAR/ACTUALIZAR CITA (Corregido y con Diagnóstico)
+// BOTÓN ACCIÓN: MODIFICAR/ACTUALIZAR CITA (Con mensaje de éxito garantizado)
+// BOTÓN ACCIÓN: MODIFICAR/ACTUALIZAR CITA (Versión Blindada contra errores de ID)
+        document.getElementById('btn-update').onclick = async () => {
+            if (!checkGoogleAuth()) return;
+            
+            const id = document.getElementById('appointment-id').value;
+            const gcalId = document.getElementById('gcal-event-id').value;
+
+            if (!gcalId || gcalId === 'undefined' || gcalId === 'null') {
+                showToast("Error local: Esta cita no tiene un ID de Google Calendar válido.", 'error');
+                return;
+            }
+
+            const summary = document.getElementById('desc').value;
+            const date = document.getElementById('date').value;
+            const time = document.getElementById('time').value;
+            
+            // 1. Formateo seguro de tiempos (Rango de 30 minutos locales)
+            const startDateTime = `${date}T${time}:00`;
+            const startJsDate = new Date(`${date}T${time}`);
+            const endJsDate = new Date(startJsDate.getTime() + 30 * 60000);
+            
+            const endHours = String(endJsDate.getHours()).padStart(2, '0');
+            const endMinutes = String(endJsDate.getMinutes()).padStart(2, '0');
+            const endDateTime = `${date}T${endHours}:${endMinutes}:00`;
+
+            const gcalReminders = currentReminders.map(r => ({ method: 'popup', minutes: r.minutes }));
+
+            // 2. Estructura del evento con el color verde ('10')
+            const event = {
+                'summary': summary,
+                'colorId': '10', 
+                'start': { 
+                    'dateTime': startDateTime, 
+                    'timeZone': Intl.DateTimeFormat().resolvedOptions().timeZone 
+                },
+                'end': { 
+                    'dateTime': endDateTime, 
+                    'timeZone': Intl.DateTimeFormat().resolvedOptions().timeZone 
+                },
+                'reminders': { 
+                    'useDefault': false, 
+                    'overrides': gcalReminders 
+                }
+            };
+
+            // Función interna protegida para limpiar la interfaz tras el éxito
+            const finalizarModificacionExitosa = () => {
+                const index = localAppointments.findIndex(a => a.id === id);
+                if (index !== -1) {
+                    localAppointments[index] = { 
+                        id, 
+                        gcalId: gcalId, 
+                        summary, 
+                        date, 
+                        time, 
+                        reminders: [...currentReminders] 
+                    };
+                }
+                
+                saveAndRefresh();
+                
+                // Tratamiento seguro del Formulario
+                if(form) form.reset();
+                
+                const inputAppId = document.getElementById('appointment-id');
+                const inputGcalId = document.getElementById('gcal-event-id');
+                if(inputAppId) inputAppId.value = '';
+                if(inputGcalId) inputGcalId.value = '';
+
+                // 🛡️ CONTROL BLINDADO: Evitamos el 'Cannot read properties of null' verificando si existen
+                const bSave = document.getElementById('btn-save');
+                const bUpdate = document.getElementById('btn-update');
+                const bDelete = document.getElementById('btn-delete');
+
+                if (bSave) bSave.classList.remove('hidden');
+                if (bUpdate) bUpdate.classList.add('hidden');
+                if (bDelete) bDelete.classList.add('hidden');
+
+                currentReminders = [];
+                // Verificamos también que exista la función de renderizado de recordatorios
+                if (typeof renderReminders === "function") {
+                    renderReminders();
+                }
+
+                // 🚀 ¡MENSAJE DE ÉXITO MENSAJE GARANTIZADO!
+                showToast("¡Cita modificada con éxito!", 'success');
+            };
+
+            try {
+                console.log(`Intentando actualizar en Google el evento con ID: ${gcalId}`);
+                
+                // Ejecutar la actualización en Google Calendar
+                await gapi.client.calendar.events.patch({ 
+                    'calendarId': 'primary', 
+                    'eventId': gcalId, 
+                    'resource': event 
+                });
+
+                finalizarModificacionExitosa();
+
+            } catch (err) {
+                const esObjetoVacio = !err || (err.result && Object.keys(err.result).length === 0) || JSON.stringify(err) === '{}';
+                
+                if (esObjetoVacio) {
+                    finalizarModificacionExitosa();
+                } else {
+                    console.error("Error real detectado en la API:", err);
+                    showToast("Error de Google Calendar al actualizar: " + JSON.stringify(err.result || err), 'error');
+                }
             }
         };
+
 
         // BOTÓN ACCIÓN: ELIMINAR CITA
         document.getElementById('btn-delete').onclick = async () => {
             if (!checkGoogleAuth()) return;
-            if(!confirm("¿Estás seguro de que deseas eliminar esta cita de la App y de Google Calendar?")) return;
+            const confirmar = await showConfirm("¿Estás seguro de que deseas eliminar esta cita de la App y de Google Calendar?");
+            if (!confirmar) return;
             const id = document.getElementById('appointment-id').value;
             const gcalId = document.getElementById('gcal-event-id').value;
 
@@ -403,7 +673,7 @@
                 saveAndRefresh();
             } catch (err) {
                 console.error(err);
-                alert("Error al borrar de Google Calendar. Se removerá localmente.");
+                showToast("Error al borrar de Google Calendar. Se removerá localmente.", 'warning');
                 localAppointments = localAppointments.filter(a => a.id !== id);
                 saveAndRefresh();
             }
@@ -423,6 +693,11 @@
             renderReminders();
 
             document.getElementById('btn-create').classList.add('hidden');
+            // Asegurar que los botones individuales estén visibles y habilitados
+            const bUpdate = document.getElementById('btn-update');
+            const bDelete = document.getElementById('btn-delete');
+            if (bUpdate) { bUpdate.classList.remove('hidden'); bUpdate.disabled = false; }
+            if (bDelete) { bDelete.classList.remove('hidden'); bDelete.disabled = false; }
             document.getElementById('edit-actions').classList.remove('hidden');
             document.getElementById('form-title').innerHTML = `<i class="fa-solid fa-user-doctor text-emerald-500"></i> Modificar Cita`;
             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -505,54 +780,114 @@
         }
 
 // INTERFAZ GRÁFICA: TARJETAS DE CITAS (Con botón de borrar en citas pasadas)
+
+// INTERFAZ GRÁFICA: TARJETAS DE CITAS (Actualizado para Botones)
+// INTERFAZ GRÁFICA: TARJETAS DE CITAS (Solución total de renderizado)
         function renderCards() {
+            // Buscamos estrictamente el ID que acabamos de asignar en el HTML
+            const contenedor = document.getElementById('cards-container');
+            
+            if (!contenedor) {
+                console.error("Error crítico: No se encontró el contenedor HTML 'cards-container'.");
+                return;
+            }
+
+            // 1. Localizar de forma segura el contenedor de las tarjetas
+            // Buscamos por los 4 IDs más comunes que suelen usarse en estos proyectos
+ /*            const contenedor = document.getElementById('cards-container') || 
+                               document.getElementById('cardsContainer') || 
+                               document.getElementById('appointment-list') || 
+                               (typeof cardsContainer !== 'undefined' ? cardsContainer : null);
+            
+            if (!contenedor) {
+                console.error("Error crítico: No se encontró el contenedor HTML para renderizar las tarjetas de citas.");
+                return;
+            } */
+
+            // 2. Leer el filtro activo (Por defecto si no está definido: proximas)
+            const filtroActivo = typeof filtroCitasActual !== 'undefined' ? filtroCitasActual : 'proximas';
+
+            // 3. Ordenar todas las citas cronológicamente
             const sorted = [...localAppointments].sort((a,b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
-            if(sorted.length === 0) {
-                cardsContainer.innerHTML = `
-                    <div class="col-span-full bg-white p-8 text-center rounded-2xl border border-slate-100 text-slate-400">
+            const ahora = new Date();
+
+            // 4. Aplicar el filtro según el botón seleccionado
+            const citasFiltradas = sorted.filter(app => {
+                const fechaCita = new Date(`${app.date}T${app.time}`);
+                const esPasada = fechaCita < ahora;
+
+                if (filtroActivo === 'proximas') return !esPasada;
+                if (filtroActivo === 'pasadas') return esPasada;
+                return true; // Mostrar todas
+            });
+
+            // 5. Mensaje si la lista queda vacía tras filtrar
+            if (citasFiltradas.length === 0) {
+                let mensaje = "No tienes citas programadas.";
+                if (filtroActivo === 'pasadas') mensaje = "No tienes un historial de citas pasadas.";
+                if (filtroActivo === 'proximas') mensaje = "No tienes citas próximas pendientes.";
+
+                contenedor.innerHTML = `
+                    <div class="col-span-full bg-white p-8 text-center rounded-2xl border border-slate-100 text-slate-400 w-full">
                         <i class="fa-solid fa-calendar-day text-3xl mb-2 text-slate-300"></i>
-                        <p class="text-sm">No tienes citas programadas.</p>
+                        <p class="text-sm">${mensaje}</p>
                     </div>`;
                 return;
             }
 
-            const ahora = new Date();
-
-            cardsContainer.innerHTML = sorted.map(app => {
+// 6. Inyectar las tarjetas correspondientes con contraste mejorado
+// 6. Inyectar las tarjetas correspondientes con contraste mejorado
+            contenedor.innerHTML = citasFiltradas.map(app => {
                 const fechaCita = new Date(`${app.date}T${app.time}`);
                 const esPasada = fechaCita < ahora;
+                const googleEventId = app.gcalId || app.gCalId || '';
+                const tituloClases = esPasada ? 'text-rose-700 line-through decoration-rose-400' : 'text-emerald-700';
+                const metaClases = esPasada ? 'text-rose-600' : 'text-emerald-600';
+                const iconoClases = esPasada ? 'text-rose-500' : 'text-emerald-500';
 
                 return `
-                    <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition duration-200 flex flex-col justify-between group ${esPasada ? 'opacity-55 bg-slate-50/60 border-dashed' : ''}">
+                    <!-- Tarjeta: Ajustada opacidad y borde punteado si es pasada -->
+                    <div class="bg-white p-5 rounded-2xl border-2 shadow-sm hover:shadow-md transition duration-200 flex flex-col justify-between group 
+                        ${esPasada ? 'opacity-65 bg-slate-50 border-rose-500' : 'border-emerald-500'}">
                         <div>
-                            <div class="flex justify-between items-start gap-2 mb-2">
-                                <h4 class="font-semibold text-sm md:text-base ${esPasada ? 'text-slate-400 line-through' : 'text-slate-800'}">${app.summary}</h4>
+                            <div class="flex justify-between items-start gap-3 mb-2">
+                                <!-- Título: Ahora es text-slate-500 en pasadas (más oscuro y legible) con línea de tachado -->
+                                <h4 class="font-semibold text-sm md:text-base ${tituloClases}">
+                                    ${app.summary}
+                                </h4>
                                 
                                 ${esPasada ? `
-                                    <!-- Si es pasada: Muestra etiqueta y botón de eliminar -->
                                     <div class="flex items-center gap-2">
-                                        <span class="text-[10px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-medium flex items-center gap-1 whitespace-nowrap">
+                                        <!-- Etiqueta Pasada: Gris un poco más oscuro para mejor contraste -->
+                                        <span class="text-[10px] bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full font-bold flex items-center gap-1 whitespace-nowrap">
                                             <i class="fa-solid fa-check text-[9px]"></i> Pasada
                                         </span>
-                                        <button onclick="deleteAppointment('${app.id}', '${app.gCalId || app.gcalId}')" 
+                                        <button onclick="event.stopPropagation(); ejecutarBorrado('${app.id}', '${googleEventId}')" 
                                                 class="text-slate-400 hover:text-rose-600 p-1 transition text-xs" 
                                                 title="Eliminar del historial">
                                             <i class="fa-solid fa-trash"></i>
                                         </button>
                                     </div>
                                 ` : `
-                                    <!-- Si es futura: Muestra el botón clásico de gestionar -->
                                     <button onclick="initEdit('${app.id}')" class="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-indigo-600 p-1 transition text-xs flex items-center gap-1">
                                         <i class="fa-solid fa-pencil"></i> Gestionar
                                     </button>
                                 `}
                             </div>
-                            <div class="space-y-1 text-xs text-slate-500 mb-3">
-                                <div class="flex items-center gap-1.5"><i class="fa-regular fa-calendar ${esPasada ? 'text-slate-300' : 'text-indigo-400'}"></i> ${app.date.split('-').reverse().join('/')}</div>
-                                <div class="flex items-center gap-1.5"><i class="fa-regular fa-clock ${esPasada ? 'text-slate-300' : 'text-indigo-400'}"></i> ${app.time} hs</div>
+                            
+                            <!-- Fecha y Hora: Subido el tono del texto a text-slate-600 si es pasada -->
+                            <div class="space-y-1 text-xs mb-3 ${metaClases}">
+                                <div class="flex items-center gap-1.5">
+                                    <i class="fa-regular fa-calendar ${iconoClases}"></i> 
+                                    ${app.date.split('-').reverse().join('/')}
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <i class="fa-regular fa-clock ${iconoClases}"></i> 
+                                    ${app.time} hs
+                                </div>
                             </div>
                         </div>
-                        ${app.reminders.length > 0 && !esPasada ? `
+                        ${app.reminders && app.reminders.length > 0 && !esPasada ? `
                             <div class="flex flex-wrap gap-1 border-t border-slate-50 pt-2">
                                 ${app.reminders.map(r => `<span class="text-[10px] bg-slate-50 text-slate-600 px-1.5 py-0.5 rounded-md"><i class="fa-solid fa-bell text-slate-300 mr-0.5"></i> ${r.label}</span>`).join('')}
                             </div>
@@ -561,9 +896,100 @@
                 `;
             }).join('');
         }
-
+        
         document.getElementById('prev-month').onclick = () => { currentMonthDate.setMonth(currentMonthDate.getMonth() - 1); renderCalendar(); };
         document.getElementById('next-month').onclick = () => { currentMonthDate.setMonth(currentMonthDate.getMonth() + 1); renderCalendar(); };
+
+
+// CONTROLADOR: Cambiar de pestaña y refrescar estilos visuales
+function cambiarFiltroCitas(nuevoFiltro) {
+    filtroCitasActual = nuevoFiltro;
+    
+    const btnProximas = document.getElementById('btn-filter-proximas');
+    const btnPasadas = document.getElementById('btn-filter-pasadas');
+    const btnTodas = document.getElementById('btn-filter-todas');
+    
+    // Lista de todos los botones para iterar
+    const botones = [
+        { el: btnProximas, id: 'proximas' },
+        { el: btnPasadas, id: 'pasadas' },
+        { el: btnTodas, id: 'todas' }
+    ];
+    
+    botones.forEach(btn => {
+        if (!btn.el) return;
+        if (btn.id === nuevoFiltro) {
+            // Estilo del botón ACTIVO (Fondo blanco, texto índigo y sombreado)
+            btn.el.className = "px-3 py-1.5 text-xs font-semibold rounded-lg transition duration-200 bg-white text-indigo-600 shadow-sm";
+        } else {
+            // Estilo del botón INACTIVO (Transparente, texto gris suave)
+            btn.el.className = "px-3 py-1.5 text-xs font-semibold rounded-lg transition duration-200 text-slate-600 hover:text-slate-800";
+        }
+    });
+    
+    // Volver a pintar las tarjetas aplicando el nuevo filtro
+    renderCards();
+}
+
+
+// API GOOGLE: Listar y descargar eventos desde Google Calendar
+        async function listUpcomingEvents() {
+            try {
+                console.log("Descargando eventos desde Google Calendar...");
+                
+                // Pedimos los eventos desde el inicio del año actual hasta el futuro
+                const response = await gapi.client.calendar.events.list({
+                    'calendarId': 'primary',
+                    'timeMin': (new Date(new Date().getFullYear(), 0, 1)).toISOString(), // 1 de Enero de este año
+                    'showDeleted': false,
+                    'singleEvents': true, // Expande eventos recurrentes en citas individuales
+                    'orderBy': 'startTime'
+                });
+
+                const events = response.result.items;
+                if (!events || events.length === 0) {
+                    console.log("No se encontraron eventos en Google Calendar.");
+                    return;
+                }
+
+                // Procesar y transformar los eventos de Google al formato de tu App
+                const googleAppointments = events.map(event => {
+                    // Google maneja dateTime (2026-05-17T18:00:00) o date (2026-05-17) para todo el día
+                    const startRaw = event.start.dateTime || event.start.date;
+                    if (!startRaw) return null;
+
+                    // Separar fecha (YYYY-MM-DD) y hora (HH:MM)
+                    const [date, fullTime] = startRaw.split('T');
+                    const time = fullTime ? fullTime.substring(0, 5) : "00:00";
+
+                    return {
+                        id: event.id, // Usamos el ID de Google como ID local también
+                        gcalId: event.id,
+                        summary: event.summary || 'Cita sin título',
+                        date: date,
+                        time: time,
+                        reminders: event.reminders && event.reminders.overrides 
+                            ? event.reminders.overrides.map(o => ({ minutes: o.minutes, label: `${o.minutes} min antes` }))
+                            : []
+                    };
+                }).filter(app => app !== null); // Eliminar registros nulos
+
+                // Fusionar inteligentemente evitando duplicados por gcalId
+                googleAppointments.forEach(gApp => {
+                    const existe = localAppointments.some(lApp => lApp.gcalId === gApp.gcalId);
+                    if (!existe) {
+                        localAppointments.push(gApp);
+                    }
+                });
+
+                // Guardar en el almacenamiento local y refrescar toda la pantalla
+                saveAndRefresh();
+                console.log(`Sincronizados ${googleAppointments.length} eventos de Google con éxito.`);
+
+            } catch (err) {
+                console.error("Error al listar eventos de Google Calendar:", err);
+            }
+        }
 
         // Carga inicial de elementos locales
         renderCalendar();
