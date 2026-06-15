@@ -716,6 +716,27 @@ let filtroCitasActual = 'proximas';
             document.getElementById('form-title').innerHTML = `<i class="fa-solid fa-calendar-plus text-indigo-500"></i> Agendar Nueva Cita`;
         }
 
+        // Al pinchar en un día del calendario sin citas, rellena la fecha y scroll al formulario
+        window.selectDateForNewAppointment = (dateStr) => {
+            // Verificar si el día tiene citas (buscando en el DOM si hay eventos)
+            const dayAppointments = localAppointments.filter(a => a.date === dateStr);
+            
+            // Siempre rellenar la fecha y preparar el formulario para nueva cita
+            resetForm();
+            document.getElementById('date').value = dateStr;
+            
+            // Scroll suave hacia el formulario
+            const formSection = document.querySelector('section.lg\\:col-span-1');
+            if (formSection) {
+                formSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            
+            // Enfocar el campo descripción para facilitar la entrada
+            setTimeout(() => {
+                document.getElementById('desc').focus();
+            }, 400);
+        };
+
         // --- INTERFAZ GRÁFICA: CALENDARIO Y TARJETAS ---
 
         function renderCalendar() {
@@ -767,8 +788,11 @@ let filtroCitasActual = 'proximas';
                     eventsHtml += `</div>`;
                 }
 
+                const hasAppointments = dayAppointments.length > 0;
+                const cellDateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+
                 daysHtml += `
-                    <div class="p-1.5 border border-slate-100 rounded-xl flex flex-col justify-between min-h-[95px] transition-all ${isToday ? 'bg-indigo-50/40 ring-1 ring-indigo-200' : 'hover:bg-slate-50/80 bg-white'}">
+                    <div onclick="selectDateForNewAppointment('${cellDateStr}')" class="p-1.5 border border-slate-100 rounded-xl flex flex-col justify-between min-h-[95px] transition-all cursor-pointer ${isToday ? 'bg-indigo-50/40 ring-1 ring-indigo-200' : 'hover:bg-slate-50/80 bg-white'}">
                         <div class="flex justify-between items-center w-full">
                             <span class="text-xs font-semibold ${isToday ? 'bg-indigo-600 text-white w-5 h-5 flex items-center justify-center rounded-full shadow-sm shadow-indigo-200' : 'text-slate-700'}">${day}</span>
                         </div>
@@ -780,9 +804,9 @@ let filtroCitasActual = 'proximas';
         }
 
 // INTERFAZ GRÁFICA: TARJETAS DE CITAS (Con botón de borrar en citas pasadas)
-
 // INTERFAZ GRÁFICA: TARJETAS DE CITAS (Actualizado para Botones)
 // INTERFAZ GRÁFICA: TARJETAS DE CITAS (Solución total de renderizado)
+
         function renderCards() {
             // Buscamos estrictamente el ID que acabamos de asignar en el HTML
             const contenedor = document.getElementById('cards-container');
