@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+    
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Citas Médicas</title>
@@ -82,6 +83,7 @@
         .step-done { background: #10b981; color: white; }
         .step-pending { background: #e2e8f0; color: #94a3b8; }
     </style>
+
 </head>
 <body class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-sky-50">
 
@@ -215,11 +217,11 @@
     <div id="appointmentModal" class="fixed inset-0 z-50 hidden">
         <div class="modal-overlay absolute inset-0" onclick="closeModal()"></div>
         <div class="absolute inset-0 flex items-center justify-center p-4">
-            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto scale-in relative">
-                <div class="gradient-header text-white p-6 rounded-t-2xl">
+            <div id="modalCard" class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto scale-in relative border-t-4 border-medical-500">
+                <div id="modalHeader" class="gradient-header text-white p-6 rounded-t-2xl">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-3">
-                            <div class="bg-white/20 p-2 rounded-lg">
+                            <div id="modalIconBg" class="bg-white/20 p-2 rounded-lg">
                                 <svg id="modalIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                             </div>
                             <h3 id="modalTitle" class="font-display text-lg font-bold">Nueva Cita Médica</h3>
@@ -481,7 +483,7 @@
                 isToday = (dateStr === todayStr);
 
                 cell = document.createElement('div');
-                cell.className = 'calendar-day p-2 min-h-[70px] rounded-xl cursor-pointer transition-all' + (isToday ? ' bg-medical-50 today-ring' : ' hover:bg-slate-50');
+                cell.className = 'calendar-day p-2 micalendarGridspace-y-1n-h-[70px] rounded-xl cursor-pointer transition-all' + (isToday ? ' bg-medical-50 today-ring' : ' hover:bg-slate-50');
                 (function(ds) {
                     cell.onclick = function() { openCreateModal(null, ds); };
                 })(dateStr);
@@ -492,13 +494,13 @@
                     htmlContent += '<span class="w-2 h-2 bg-medical-500 rounded-full"></span>';
                 }
                 htmlContent += '</div>';
-
+        
                 if (dayAppointments.length > 0) {
                     htmlContent += '<div class="space-y-1">';
                     var showCount = Math.min(dayAppointments.length, 2);
                     for (aptIdx = 0; aptIdx < showCount; aptIdx++) {
                         aptColor = ['bg-blue-100 text-blue-700', 'bg-green-100 text-green-700', 'bg-purple-100 text-purple-700', 'bg-amber-100 text-amber-700'][aptIdx % 4];
-                        htmlContent += '<div class="' + aptColor + ' text-[10px] font-medium px-2 py-0.5 rounded-md truncate cursor-pointer hover:opacity-80" title="' + dayAppointments[aptIdx].descripcion + '">' + dayAppointments[aptIdx].hora + ' ' + dayAppointments[aptIdx].descripcion + '</div>';
+                        htmlContent += '<div onclick="event.stopPropagation(); editAppointment(\'' + dayAppointments[aptIdx].id + '\')" class="' + aptColor + ' text-[10px] font-medium px-2 py-0.5 rounded-md truncate cursor-pointer hover:opacity-80" title="' + dayAppointments[aptIdx].descripcion + '">' + dayAppointments[aptIdx].hora + ' ' + dayAppointments[aptIdx].descripcion + '</div>';
                     }
                     if (dayAppointments.length > 2) {
                         htmlContent += '<div class="text-[10px] text-slate-400 text-center">+' + (dayAppointments.length - 2) + ' más</div>';
@@ -724,6 +726,14 @@
                 document.getElementById('submitText').textContent = 'Guardar Cambios';
                 document.getElementById('btnDelete').classList.remove('hidden');
 
+                // Visual differentiation for edit mode
+                document.getElementById('modalCard').classList.remove('border-medical-500');
+                document.getElementById('modalCard').classList.add('border-amber-500');
+                document.getElementById('modalHeader').classList.remove('gradient-header');
+                document.getElementById('modalHeader').classList.add('bg-amber-600');
+                document.getElementById('modalIconBg').classList.remove('bg-white/20');
+                document.getElementById('modalIconBg').classList.add('bg-amber-500');
+
                 document.getElementById('appointmentId').value = apt.id;
                 document.getElementById('googleEventId').value = apt.googleEventId || '';
                 document.getElementById('descripcion').value = apt.descripcion;
@@ -746,6 +756,14 @@
                 document.getElementById('btnDelete').classList.add('hidden');
                 document.getElementById('appointmentId').value = '';
                 document.getElementById('googleEventId').value = '';
+
+                // Visual differentiation for create mode
+                document.getElementById('modalCard').classList.remove('border-amber-500');
+                document.getElementById('modalCard').classList.add('border-medical-500');
+                document.getElementById('modalHeader').classList.remove('bg-amber-600');
+                document.getElementById('modalHeader').classList.add('gradient-header');
+                document.getElementById('modalIconBg').classList.remove('bg-amber-500');
+                document.getElementById('modalIconBg').classList.add('bg-white/20');
 
                 if (dateStr) {
                     document.getElementById('fecha').value = dateStr;
